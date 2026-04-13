@@ -1,8 +1,16 @@
-def find_drift(master_config_path, current_config):
-    """Compara el archivo maestro con la config actual."""
-    with open(master_config_path, 'r') as f:
-        master = f.read()
+# drift_engine.py
+
+def detect_drift(master_file_path, current_config):
+    """
+    Compara la configuración actual con el archivo maestro línea por línea.
+    Retorna una lista de comandos que faltan en el equipo.
+    """
+    with open(master_file_path, 'r') as f:
+        master_lines = set(line.strip() for line in f if line.strip())
     
-    if master != current_config:
-        return True # Se detectó un cambio
-    return False
+    current_lines = set(line.strip() for line in current_config.splitlines() if line.strip())
+    
+    # Identificar líneas que están en el maestro pero NO en el router actual
+    missing_commands = list(master_lines - current_lines)
+    
+    return missing_commands
