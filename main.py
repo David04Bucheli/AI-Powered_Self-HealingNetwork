@@ -1,42 +1,42 @@
+# main.py
 import time
+import os
 from devices import all_devices
-from network_driver import get_running_config, apply_remediation
-from drift_engine import find_drift
+from network_driver import get_vyos_config, apply_repair
+from drift_engine import detect_drift
 
-POLLING_INTERVAL = 60  # Segundos entre cada revisión
+POLLING_TIME = 60 # Tiempo de espera entre revisiones
 
-def run_monitor():
-    print("--- Iniciando Sistema de Auto-reparación ---")
+def start_self_healing():
+    print("--- INICIANDO SISTEMA DE AUTO-REPARACIÓN VYOS ---")
     while True:
         for device in all_devices:
-            print(f"Revisando estado de: {device['host']}...")
+            ip = device['host']
+            master_cfg = f"master_configs/{ip}_master.txt"
             
+            if not os.path.exists(master_cfg):
+                print(f"[!] Error: No existe archivo maestro para {ip}. Saltando...")
+                continue
+
             try:
-                # 1. Obtener config actual (Polling SSH)
-                current_cfg = get_running_config(device)
+                print(f"[*] Monitoreando {ip}...")
+                current_config = get_vyos_config(device)
                 
-                # 2. Detectar Drift (Deriva de configuración)
-                master_path = f"master_configs/{device['host']}_master.txt"
-                if find_drift(master_path, current_cfg):
-                    print(f"¡ALERTA! Se detectó un cambio no autorizado en {device['host']}.")
-                    
-                    # 3. Reparación
-                    print("Restaurando configuración maestra...")
-                    with open(master_path, 'r') as f:
-                        master_content = f.read()
-                    
-                    # Convertimos el archivo maestro en una lista de comandos para Netmiko
-                    commands = master_content.splitlines()
-                    apply_remediation(device, commands)
-                    print("Reparación exitosa.")
+                # Detectar si hay cambios (Drift)
+                diff = detect_drift(master_cfg, current_config)
+                
+                if diff:
+                    print(f"[ALERT] Se detectó anomalía en {ip}. Reparando...")
+                    apply_repair(device, diff)
+                    print(f"[OK] {ip} ha sido restaurado exitosamente.")
                 else:
-                    print(f"Estado de {device['host']}: OK (Sin cambios).")
-                    
+                    print(f"[OK] {ip} sin cambios detectados.")
+
             except Exception as e:
-                print(f"Error al conectar con {device['host']}: {e}")
-        
-        print(f"Esperando {POLLING_INTERVAL} segundos para la próxima revisión...")
-        time.sleep(POLLING_INTERVAL)
+                print(f"[ERROR] No se pudo conectar con {ip}: {e}")
+
+        print(f"\nPróximo polling en {POLLING_TIME} segundos...\n")
+        time.sleep(POLLING_TIME)
 
 if __name__ == "__main__":
-    run_monitor()
+    start_self_healing()
