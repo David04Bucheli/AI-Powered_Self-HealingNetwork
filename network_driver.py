@@ -1,11 +1,15 @@
+# network_driver.py
 from netmiko import ConnectHandler
 
-def get_running_config(device_params):
-    """Se conecta al router y extrae la configuración actual."""
+def get_vyos_config(device_params):
+    """Obtiene la configuración actual en formato de comandos 'set'."""
     with ConnectHandler(**device_params) as ssh:
-        return ssh.send_command("show running-config")
+        # VyOS requiere este comando específico para auditoría de cambios
+        return ssh.send_command("show configuration commands")
 
-def apply_remediation(device_params, config_commands):
-    """Aplica los comandos necesarios para reparar el router."""
+def apply_repair(device_params, commands):
+    """Ingresa al modo configuración y restaura los comandos faltantes."""
     with ConnectHandler(**device_params) as ssh:
-        return ssh.send_config_set(config_commands)
+        ssh.send_config_set(commands)
+        ssh.send_command("commit")
+        return ssh.send_command("save")
