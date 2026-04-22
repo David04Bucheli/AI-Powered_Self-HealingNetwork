@@ -20,5 +20,5 @@ r3 = {
     'password': 'vyos',
 }
 
-# Lista maestra que recorrerá el script de monitoreo
+# lista de routers
 all_devices = [r1, r2, r3]

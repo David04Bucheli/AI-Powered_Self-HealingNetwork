@@ -6,10 +6,8 @@ def detect_drift(master_file_path, current_config):
     
     current_lines = set(line.strip() for line in current_config.splitlines() if line.strip())
     
-    # Comandos que están en el maestro pero NO en el router (Lo que falta)
-    missing = list(master_lines - current_lines)
+    missing = list(master_lines - current_lines)        # comandos que faltan
     
-    # Comandos que están en el router pero NO en el maestro (Lo que sobra/cambió)
-    extra = list(current_lines - master_lines)
+    extra = list(current_lines - master_lines)      # comandos que sobran
     
     return missing, extra

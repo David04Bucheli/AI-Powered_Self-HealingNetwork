@@ -4,8 +4,7 @@ from devices import all_devices
 from network_driver import get_vyos_config, apply_repair
 from drift_engine import detect_drift
 
-# Tiempo de espera entre revisiones (Polling)
-POLLING_TIME = 60 
+POLLING_TIME = 60       # espera entre ciclos 
 
 def start_self_healing():
     print("="*50)
@@ -17,7 +16,7 @@ def start_self_healing():
             ip = device['host']
             master_cfg = f"master_configs/{ip}_master.txt"
             
-            # Verificar si existe el archivo maestro para este router
+            # existencia de router
             if not os.path.exists(master_cfg):
                 print(f"[!] Error: No se encontró archivo maestro para {ip}")
                 continue
@@ -26,27 +25,23 @@ def start_self_healing():
                 print(f"\n[*] Analizando {ip}...")
                 current_config = get_vyos_config(device)
                 
-                # Obtener comandos faltantes y comandos extra/cambiados
+                # comandos faltantes y sobrantes
                 missing, extra = detect_drift(master_cfg, current_config)
                 
                 if missing or extra:
                     print(f"[ALERT] Anomalía detectada en el router {ip}:")
                     
-                    # Reportar detalles específicos de la anomalía
-                    if extra:
+                    if extra:       # hay comandos de mas
                         for e in extra:
                             print(f"  [+] Sobra/Cambio: {e}")
-                    if missing:
+                    if missing:     # faltan comandos
                         for m in missing:
                             print(f"  [-] Falta: {m}")
                     
-                    # Construir plan de reparación
-                    # 1. Los comandos 'extra' se eliminan (usando 'delete')
-                    # 2. Los comandos 'missing' se vuelven a aplicar (usando 'set')
+                    # reparar - eliminar extra y agregar faltantes
                     repair_commands = []
                     for e in extra:
-                        # Convertimos el comando 'set' en un 'delete'
-                        repair_commands.append(e.replace("set", "delete"))
+                        repair_commands.append(e.replace("set", "delete"))      # eliminamos comandos
                     
                     for m in missing:
                         repair_commands.append(m)
@@ -58,7 +53,7 @@ def start_self_healing():
                 else:
                     print(f"[OK] {ip} se encuentra en cumplimiento (Sin drift).")
 
-            except Exception as e:
+            except Exception as e:      # reportamos errores
                 print(f"[ERROR] Fallo de conexión con {ip}: {e}")
 
         print(f"\n" + "-"*30)
