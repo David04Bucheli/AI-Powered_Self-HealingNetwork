@@ -1,7 +1,10 @@
 from openai import OpenAI
 
 # Configura tu API Key de OpenAI
-client = OpenAI(api_key="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")
+client = OpenAI(
+    api_key="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",
+    base_url="https://api.openai.com/v1"
+)
 
 def get_ai_remediation(telemetry_data):
     """Envía datos de congestión a la IA y recibe comandos de VyOS."""
@@ -14,7 +17,7 @@ def get_ai_remediation(telemetry_data):
     """
     
     response = client.chat.completions.create(
-        model="gpt-4o", # O gpt-3.5-turbo
+        model="llama-3.3-70b-instruct",
         messages=[{"role": "user", "content": prompt}]
     )
     

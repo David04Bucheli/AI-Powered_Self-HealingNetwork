@@ -2,7 +2,7 @@ import time
 import os
 from ai_engine import get_ai_remediation
 from devices import all_devices
-from network_driver import get_vyos_config, apply_repair
+from network_driver import apply_ai_commands, get_vyos_config, apply_repair, get_vyos_stats
 from drift_engine import detect_drift
 
 POLLING_TIME = 60       # espera entre ciclos 
