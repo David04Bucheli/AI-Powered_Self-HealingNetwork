@@ -2,7 +2,7 @@ from openai import OpenAI
 
 # Configura tu API Key de OpenAI
 client = OpenAI(
-    api_key="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",
+    api_key="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",
     base_url="https://api.openai.com/v1"
 )
 
