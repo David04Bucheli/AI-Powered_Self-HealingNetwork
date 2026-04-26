@@ -54,17 +54,22 @@ def start_self_healing():
                 else:
                     print(f"[OK] {ip} se encuentra en cumplimiento (Sin drift).")
 
-                # Extraemos estadísticas de tráfico
-                stats = get_vyos_stats(device) # Necesitas esta función en network_driver
+                # Esto soluciona congestión o tráfico excesivo.
+                print(f"[*] Extrayendo telemetría de {ip}...")
+                telemetry = get_vyos_stats(device)
                 
-                if "input packets" in stats:
-                    # Lógica simple: si el tráfico es muy alto, consultamos a la IA
-                    print(f"[*] Analizando telemetría de {ip} con IA...")
-                    ai_commands = get_ai_remediation(stats)
+                # Criterio simple: Si hay palabras de alerta en la telemetría, consultamos a la IA
+                if "errors" in telemetry or "dropped" in telemetry or "overruns" in telemetry:
+                    print(f"[!] Anomalía de tráfico detectada. Consultando a la IA...")
+                    ai_advice = get_ai_remediation(telemetry)
                     
-                    print(f"[AI ALERT] La IA recomienda aplicar: {ai_commands}")
-                    apply_repair(device, ai_commands)
-
+                    if ai_advice:
+                        print(f"[AI DECISION] Aplicando medidas de mitigación sugeridas:")
+                        for cmd in ai_advice: print(f"  > {cmd}")
+                        apply_ai_commands(device, ai_advice)
+                else:
+                    print(f"[OK] Rendimiento de {ip} dentro de los parámetros normales.")
+                    
             except Exception as e:      # reportamos errores
                 print(f"[ERROR] Fallo de conexión con {ip}: {e}")
 
