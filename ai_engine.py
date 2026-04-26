@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 # Configura tu API Key de OpenAI
-client = OpenAI(api_key="TU_API_KEY_AQUI")
+client = OpenAI(api_key="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")
 
 def get_ai_remediation(telemetry_data):
     """Envía datos de congestión a la IA y recibe comandos de VyOS."""

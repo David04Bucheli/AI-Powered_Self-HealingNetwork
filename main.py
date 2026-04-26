@@ -1,5 +1,6 @@
 import time
 import os
+from ai_engine import get_ai_remediation
 from devices import all_devices
 from network_driver import get_vyos_config, apply_repair
 from drift_engine import detect_drift
