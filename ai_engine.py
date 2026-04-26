@@ -19,7 +19,7 @@ def get_ai_remediation(telemetry_data):
     try:
         # El error 404 suele ocurrir aquí por el nombre del 'model'
         response = client.chat.completions.create(
-            model="z-ai/glm-4.7", # Cambia a "gpt-4" si tienes acceso, pero 3.5 es más seguro para evitar 404
+            model="meta/llama-3.1-70b-instruct", # Cambia a "gpt-4" si tienes acceso, pero 3.5 es más seguro para evitar 404
             messages=[
                 {"role": "system", "content": "Eres un asistente técnico de redes VyOS."},
                 {"role": "user", "content": prompt}

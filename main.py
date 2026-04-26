@@ -1,4 +1,5 @@
 import time
+import re
 import os
 from ai_engine import get_ai_remediation
 from devices import all_devices
@@ -57,9 +58,10 @@ def start_self_healing():
                 # Esto soluciona congestión o tráfico excesivo.
                 print(f"[*] Extrayendo telemetría de {ip}...")
                 telemetry = get_vyos_stats(device)
+                anomalia = re.findall(r"(errors|dropped|overrun)\s+([1-9]\d*)", telemetry)
                 
                 # Criterio simple: Si hay palabras de alerta en la telemetría, consultamos a la IA
-                if "errors" in telemetry or "dropped" in telemetry or "overruns" in telemetry:
+                if anomalia:
                     print(f"[!] Anomalía de tráfico detectada. Consultando a la IA...")
                     ai_advice = get_ai_remediation(telemetry)
                     
