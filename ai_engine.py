@@ -16,9 +16,27 @@ def get_ai_remediation(telemetry_data):
     Responde SOLO con los comandos, uno por línea, sin explicaciones.
     """
     
+<<<<<<< HEAD
     response = client.chat.completions.create(
         model="llama-3.3-70b-instruct",
         messages=[{"role": "user", "content": prompt}]
     )
     
     return response.choices[0].message.content.splitlines()
+=======
+    try:
+        # El error 404 suele ocurrir aquí por el nombre del 'model'
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo", # Cambia a "gpt-4" si tienes acceso, pero 3.5 es más seguro para evitar 404
+            messages=[
+                {"role": "system", "content": "Eres un asistente técnico de redes VyOS."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0
+        )
+        return response.choices[0].message.content.splitlines()
+    except Exception as e:
+        # Esto te dirá exactamente qué falló si no es el 404
+        print(f"[AI ERROR] Detalle: {e}")
+        return []
+>>>>>>> 028fc9f26b0cc5edff77fee6c0fac077261711ce
