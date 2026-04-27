@@ -1,0 +1,537 @@
+[2026-04-27 15:54:42] =======================================================
+[2026-04-27 15:54:42]    SISTEMA AUTO-REPARACIÓN NetDevOps + IA  (VyOS)   
+[2026-04-27 15:54:42] =======================================================
+[2026-04-27 15:54:42] Dispositivos: ['192.168.1.1', '10.0.12.2', '10.0.13.3']
+[2026-04-27 15:54:42] Polling: cada 60s | Análisis IA: cada 2 ciclos
+[2026-04-27 15:54:42] Aplicar comandos IA: NO (modo auditoría)
+[2026-04-27 15:54:42] 
+[2026-04-27 15:54:42] ──────────────────── Ciclo #1 ────────────────────
+[2026-04-27 15:54:42] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 15:54:52] [OK] 192.168.1.1 sin drift de configuración.
+[2026-04-27 15:54:52] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 15:55:02] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 15:55:02]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 15:55:02]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 15:55:02]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 15:55:02]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 15:55:02] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 15:55:33] [OK] 10.0.12.2 restaurado.
+[2026-04-27 15:55:33] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 15:55:43] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 15:55:43] 
+Ciclo #1 completado. Próximo en 60s.
+[2026-04-27 15:55:43] ───────────────────────────────────────────────────────
+
+[2026-04-27 15:56:43] ──────────────────── Ciclo #2 ────────────────────
+[2026-04-27 15:56:43] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:29:51] =======================================================
+[2026-04-27 18:29:51]    SISTEMA AUTO-REPARACIÓN NetDevOps + IA  (VyOS)   
+[2026-04-27 18:29:51] =======================================================
+[2026-04-27 18:29:51] Dispositivos: ['192.168.1.1', '10.0.12.2', '10.0.13.3']
+[2026-04-27 18:29:51] Polling: cada 60s | Análisis IA: cada 2 ciclos
+[2026-04-27 18:29:51] Aplicar comandos IA: NO (modo auditoría)
+[2026-04-27 18:29:51] 
+[2026-04-27 18:29:51] ──────────────────── Ciclo #1 ────────────────────
+[2026-04-27 18:29:51] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:30:10] [ALERT] Drift detectado en 192.168.1.1:
+[2026-04-27 18:30:10]   [-] Falta: set system login user vyos authentication encrypted-password '!'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:30:10]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:30:10]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:34:06:cd:00:02'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:30:10]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:30:10]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:30:10]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:30:10]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:30:10]   [-] Falta: set protocols ospf area 0 network '192.168.0.0/16'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth1 address '10.0.12.1/24'
+[2026-04-27 18:30:10]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:34:06:cd:00:01'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth0 address '192.168.1.1/24'
+[2026-04-27 18:30:10]   [-] Falta: set protocols ospf area 0 network '10.0.0.0/8'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:34:06:cd:00:00'
+[2026-04-27 18:30:10]   [-] Falta: set system login user admin authentication encrypted-password '$6$XOozHC3Kj$kCXtPvwCxM8O/22XWWhs6jzER/Rj4fKIzlMt0QsnMnP8wK1hfzZK1eNchFIiPHJmOoM4VOaS5mRMV.Ox0O9qK.'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth2 address '10.0.13.1/24'
+[2026-04-27 18:30:10]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:30:10]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:30:10]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:30:10] [*] Reparando configuración de 192.168.1.1...
+[2026-04-27 18:30:39] [ERROR] Fallo con 192.168.1.1: 
+
+Pattern not detected: '\\[edit\\]' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:30:39] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:30:59] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:30:59]   [+] Sobra: admin@vyos:~$
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth1 address '10.0.12.2/24'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:f4:f2:f7:00:01'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth0 address '192.168.2.1/24'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:30:59]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:30:59]   [-] Falta: set system login user admin authentication encrypted-password '$6$BqsiBdZE1v/e8yP$XCEaRpNbFawOZRy3IsG3xi9S7jsTApN1T/8hawItJo1nVXlE0CVRean4E8pqhlheudbKb0TbrLKX7GBelSZg7/'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth2 address '10.0.23.2/24'
+[2026-04-27 18:30:59]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set protocols ospf area 0 network '192.168.2.0/24'
+[2026-04-27 18:30:59]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:30:59]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:30:59]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:30:59]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:30:59]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:30:59]   [-] Falta: set system login user vyos authentication encrypted-password '$6$3QAXO/8o$2N9YuZOBz2fmcyp3RUKs.AgQthle1Px5fUhJjM7VMzCWEKqsR0rFYDHRgb3XF5NJfXIOhJ5bbwTgnFiSXL.w0.'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:30:59]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:30:59]   [-] Falta: set protocols ospf area 0 network '10.0.12.0/24'
+[2026-04-27 18:30:59]   [-] Falta: set protocols ospf area 0 network '10.0.23.0/24'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:f4:f2:f7:00:02'
+[2026-04-27 18:30:59]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:f4:f2:f7:00:00'
+[2026-04-27 18:30:59]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:30:59]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:30:59]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:30:59] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:31:29] [ERROR] Fallo con 10.0.12.2: 
+
+Pattern not detected: '\\[edit\\]' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:31:29] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:31:43] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:31:43] 
+Ciclo #1 completado. Próximo en 60s.
+[2026-04-27 18:31:43] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:32:43] ──────────────────── Ciclo #2 ────────────────────
+[2026-04-27 18:32:43] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:32:53] [OK] 192.168.1.1 sin drift de configuración.
+[2026-04-27 18:32:53] [AI] Recolectando métricas de congestión en 192.168.1.1...
+[2026-04-27 18:33:06] [AI] 192.168.1.1 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:33:06] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:33:16] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:33:16]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 18:33:16]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 18:33:16]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 18:33:16]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 18:33:16] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:33:55] [OK] 10.0.12.2 restaurado.
+[2026-04-27 18:33:55] [AI] Recolectando métricas de congestión en 10.0.12.2...
+[2026-04-27 18:34:06] [AI] 10.0.12.2 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:34:06] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:34:18] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:34:18] [AI] Recolectando métricas de congestión en 10.0.13.3...
+[2026-04-27 18:34:30] [AI] 10.0.13.3 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:34:30] 
+Ciclo #2 completado. Próximo en 60s.
+[2026-04-27 18:34:30] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:35:30] ──────────────────── Ciclo #3 ────────────────────
+[2026-04-27 18:35:30] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:35:40] [OK] 192.168.1.1 sin drift de configuración.
+[2026-04-27 18:35:40] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:35:51] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:35:51]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 18:35:51]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 18:35:51]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 18:35:51]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 18:35:51] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:36:28] [OK] 10.0.12.2 restaurado.
+[2026-04-27 18:36:28] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:36:39] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:36:39] 
+Ciclo #3 completado. Próximo en 60s.
+[2026-04-27 18:36:39] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:37:39] ──────────────────── Ciclo #4 ────────────────────
+[2026-04-27 18:37:39] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:37:49] [OK] 192.168.1.1 sin drift de configuración.
+[2026-04-27 18:37:49] [AI] Recolectando métricas de congestión en 192.168.1.1...
+[2026-04-27 18:38:01] [AI] 192.168.1.1 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:38:01] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:38:11] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:38:11]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 18:38:11]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 18:38:11]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 18:38:11]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 18:38:11] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:38:46] [OK] 10.0.12.2 restaurado.
+[2026-04-27 18:38:46] [AI] Recolectando métricas de congestión en 10.0.12.2...
+[2026-04-27 18:38:57] [AI] 10.0.12.2 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:38:57] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:39:08] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:39:08] [AI] Recolectando métricas de congestión en 10.0.13.3...
+[2026-04-27 18:39:21] [AI] 10.0.13.3 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:39:21] 
+Ciclo #4 completado. Próximo en 60s.
+[2026-04-27 18:39:21] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:40:21] ──────────────────── Ciclo #5 ────────────────────
+[2026-04-27 18:40:21] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:40:41] [ALERT] Drift detectado en 192.168.1.1:
+[2026-04-27 18:40:41]   [-] Falta: set system login user vyos authentication encrypted-password '!'
+[2026-04-27 18:40:41]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:40:41]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:40:41]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:40:41]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:40:41]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:40:41]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:40:41]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:34:06:cd:00:02'
+[2026-04-27 18:40:41]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:40:41]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:40:41]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:40:41]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:40:42]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:40:42]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:40:42]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:40:42]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:40:42]   [-] Falta: set protocols ospf area 0 network '192.168.0.0/16'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth1 address '10.0.12.1/24'
+[2026-04-27 18:40:42]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:34:06:cd:00:01'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:40:42]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth0 address '192.168.1.1/24'
+[2026-04-27 18:40:42]   [-] Falta: set protocols ospf area 0 network '10.0.0.0/8'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:34:06:cd:00:00'
+[2026-04-27 18:40:42]   [-] Falta: set system login user admin authentication encrypted-password '$6$XOozHC3Kj$kCXtPvwCxM8O/22XWWhs6jzER/Rj4fKIzlMt0QsnMnP8wK1hfzZK1eNchFIiPHJmOoM4VOaS5mRMV.Ox0O9qK.'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth2 address '10.0.13.1/24'
+[2026-04-27 18:40:42]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:40:42]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:40:42]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:40:42] [*] Reparando configuración de 192.168.1.1...
+[2026-04-27 18:41:12] [ERROR] Fallo con 192.168.1.1: 
+
+Pattern not detected: '\\[edit\\]' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:41:12] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:41:39] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:41:39]   [+] Sobra: admin@vyos:~$
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth1 address '10.0.12.2/24'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:f4:f2:f7:00:01'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth0 address '192.168.2.1/24'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:41:39]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:41:39]   [-] Falta: set system login user admin authentication encrypted-password '$6$BqsiBdZE1v/e8yP$XCEaRpNbFawOZRy3IsG3xi9S7jsTApN1T/8hawItJo1nVXlE0CVRean4E8pqhlheudbKb0TbrLKX7GBelSZg7/'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth2 address '10.0.23.2/24'
+[2026-04-27 18:41:39]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set protocols ospf area 0 network '192.168.2.0/24'
+[2026-04-27 18:41:39]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:41:39]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:41:39]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:41:39]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:41:39]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:41:39]   [-] Falta: set system login user vyos authentication encrypted-password '$6$3QAXO/8o$2N9YuZOBz2fmcyp3RUKs.AgQthle1Px5fUhJjM7VMzCWEKqsR0rFYDHRgb3XF5NJfXIOhJ5bbwTgnFiSXL.w0.'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:41:39]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:41:39]   [-] Falta: set protocols ospf area 0 network '10.0.12.0/24'
+[2026-04-27 18:41:39]   [-] Falta: set protocols ospf area 0 network '10.0.23.0/24'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:f4:f2:f7:00:02'
+[2026-04-27 18:41:39]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:f4:f2:f7:00:00'
+[2026-04-27 18:41:39]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:41:39]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:41:39]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:41:39] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:42:06] [ERROR] Fallo con 10.0.12.2: 
+
+Pattern not detected: '\\[edit\\]' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:42:06] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:42:22] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:42:22] 
+Ciclo #5 completado. Próximo en 60s.
+[2026-04-27 18:42:22] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:43:22] ──────────────────── Ciclo #6 ────────────────────
+[2026-04-27 18:43:22] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:43:40] [ALERT] Drift detectado en 192.168.1.1:
+[2026-04-27 18:43:40]   [+] Sobra: admin@vyos:~$
+[2026-04-27 18:43:40]   [+] Sobra: admin@vyos:~$ show configuration commands
+[2026-04-27 18:43:40]   [-] Falta: set system login user vyos authentication encrypted-password '!'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:43:40]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:43:40]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:34:06:cd:00:02'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:43:40]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:43:40]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:43:40]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:43:40]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:43:40]   [-] Falta: set protocols ospf area 0 network '192.168.0.0/16'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth1 address '10.0.12.1/24'
+[2026-04-27 18:43:40]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:34:06:cd:00:01'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth0 address '192.168.1.1/24'
+[2026-04-27 18:43:40]   [-] Falta: set protocols ospf area 0 network '10.0.0.0/8'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:34:06:cd:00:00'
+[2026-04-27 18:43:40]   [-] Falta: set system login user admin authentication encrypted-password '$6$XOozHC3Kj$kCXtPvwCxM8O/22XWWhs6jzER/Rj4fKIzlMt0QsnMnP8wK1hfzZK1eNchFIiPHJmOoM4VOaS5mRMV.Ox0O9qK.'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth2 address '10.0.13.1/24'
+[2026-04-27 18:43:40]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:43:40]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:43:40]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:43:40] [*] Reparando configuración de 192.168.1.1...
+[2026-04-27 18:44:13] [ERROR] Fallo con 192.168.1.1: 
+
+Pattern not detected: '\\[edit\\]' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:44:13] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:44:34] [ERROR] Fallo con 10.0.12.2: 
+
+Pattern not detected: '(\\$|\\#|>)' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:44:34] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:44:51] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:44:51] [AI] Recolectando métricas de congestión en 10.0.13.3...
+[2026-04-27 18:45:07] [AI] 10.0.13.3 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:45:07] 
+Ciclo #6 completado. Próximo en 60s.
+[2026-04-27 18:45:07] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:46:07] ──────────────────── Ciclo #7 ────────────────────
+[2026-04-27 18:46:07] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:46:25] [OK] 192.168.1.1 sin drift de configuración.
+[2026-04-27 18:46:25] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:46:40] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:46:40]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 18:46:40]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 18:46:40]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 18:46:40]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 18:46:40] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:47:41] [OK] 10.0.12.2 restaurado.
+[2026-04-27 18:47:41] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:47:55] [OK] 10.0.13.3 sin drift de configuración.
+[2026-04-27 18:47:55] 
+Ciclo #7 completado. Próximo en 60s.
+[2026-04-27 18:47:55] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:48:55] ──────────────────── Ciclo #8 ────────────────────
+[2026-04-27 18:48:55] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:49:08] [OK] 192.168.1.1 sin drift de configuración.
+[2026-04-27 18:49:08] [AI] Recolectando métricas de congestión en 192.168.1.1...
+[2026-04-27 18:49:28] [AI] 192.168.1.1 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:49:28] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:49:45] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:49:45]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 18:49:45]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 18:49:45]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 18:49:45]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 18:49:45] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:50:39] [OK] 10.0.12.2 restaurado.
+[2026-04-27 18:50:39] [AI] Recolectando métricas de congestión en 10.0.12.2...
+[2026-04-27 18:50:59] [AI] 10.0.12.2 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:50:59] [DRIFT] Analizando 10.0.13.3...
+[2026-04-27 18:51:13] [ALERT] Drift detectado en 10.0.13.3:
+[2026-04-27 18:51:13]   [-] Falta: set system login user vyos authentication encrypted-password '!'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:51:13]   [-] Falta: set system login user admin authentication encrypted-password '$6$ERLlKVu48CLeXmXD$S/.TBTAUnYuZAiO0SaU.2w4j6eVp6EU5rXCjXSs0WYp5dyognl22h7x6leF8fFYEuot/mfNYl91Fwk2WGDLz51'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:52:ba:89:00:01'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth0 address '192.168.3.1/24'
+[2026-04-27 18:51:13]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:51:13]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:52:ba:89:00:00'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth2 address '10.0.13.3/24'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:51:13]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:51:13]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:51:13]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:51:13]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth1 address '10.0.23.3/24'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:51:13]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:51:13]   [-] Falta: set protocols ospf area 0 network '10.0.23.0/24'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set protocols ospf area 0 network '10.0.13.0/24'
+[2026-04-27 18:51:13]   [-] Falta: set protocols ospf area 0 network '192.168.3.0/24'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:52:ba:89:00:02'
+[2026-04-27 18:51:13]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:51:13]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:51:13]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:51:13]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:51:13] [*] Reparando configuración de 10.0.13.3...
+[2026-04-27 18:53:23] [OK] 10.0.13.3 restaurado.
+[2026-04-27 18:53:23] [AI] Recolectando métricas de congestión en 10.0.13.3...
+[2026-04-27 18:53:46] [AI] 10.0.13.3 — Sin anomalías de congestión detectadas.
+[2026-04-27 18:53:46] 
+Ciclo #8 completado. Próximo en 60s.
+[2026-04-27 18:53:46] ───────────────────────────────────────────────────────
+
+[2026-04-27 18:55:07] =======================================================
+[2026-04-27 18:55:07]    SISTEMA AUTO-REPARACIÓN NetDevOps + IA  (VyOS)   
+[2026-04-27 18:55:07] =======================================================
+[2026-04-27 18:55:07] Dispositivos: ['192.168.1.1', '10.0.12.2', '10.0.13.3']
+[2026-04-27 18:55:07] Polling: cada 60s | Análisis IA: cada 2 ciclos
+[2026-04-27 18:55:07] Aplicar comandos IA: NO (modo auditoría)
+[2026-04-27 18:55:07] 
+[2026-04-27 18:55:07] ──────────────────── Ciclo #1 ────────────────────
+[2026-04-27 18:55:07] [DRIFT] Analizando 192.168.1.1...
+[2026-04-27 18:55:21] [ALERT] Drift detectado en 192.168.1.1:
+[2026-04-27 18:55:21]   [-] Falta: set system host-name 'vyos'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth1 duplex 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set system time-zone 'UTC'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth1 hw-id '0c:34:06:cd:00:01'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth2 duplex 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth0 smp-affinity 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set system syslog global facility protocols level 'debug'
+[2026-04-27 18:55:21]   [-] Falta: set system console device ttyS0 speed '9600'
+[2026-04-27 18:55:21]   [-] Falta: set system ntp server 0.pool.ntp.org
+[2026-04-27 18:55:21]   [-] Falta: set system login user vyos level 'admin'
+[2026-04-27 18:55:21]   [-] Falta: set system ntp server 1.pool.ntp.org
+[2026-04-27 18:55:21]   [-] Falta: set system ntp server 2.pool.ntp.org
+[2026-04-27 18:55:21]   [-] Falta: set system syslog global facility all level 'info'
+[2026-04-27 18:55:21]   [-] Falta: set system login user vyos authentication encrypted-password '!'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth1 smp-affinity 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth0 duplex 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth2 speed 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces loopback lo
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth1 speed 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth2 hw-id '0c:34:06:cd:00:02'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth0 speed 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth1 address '10.0.12.1/24'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth0 hw-id '0c:34:06:cd:00:00'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth0 address '192.168.1.1/24'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth2 smp-affinity 'auto'
+[2026-04-27 18:55:21]   [-] Falta: set system login user admin authentication plaintext-password ''
+[2026-04-27 18:55:21]   [-] Falta: set system config-management commit-revisions '100'
+[2026-04-27 18:55:21]   [-] Falta: set system login user admin level 'admin'
+[2026-04-27 18:55:21]   [-] Falta: set protocols ospf area 0 network '10.0.0.0/8'
+[2026-04-27 18:55:21]   [-] Falta: set system login user vyos authentication plaintext-password ''
+[2026-04-27 18:55:21]   [-] Falta: set system login user admin authentication encrypted-password '$6$XOozHC3Kj$kCXtPvwCxM8O/22XWWhs6jzER/Rj4fKIzlMt0QsnMnP8wK1hfzZK1eNchFIiPHJmOoM4VOaS5mRMV.Ox0O9qK.'
+[2026-04-27 18:55:21]   [-] Falta: set interfaces ethernet eth2 address '10.0.13.1/24'
+[2026-04-27 18:55:21]   [-] Falta: set service ssh port '22'
+[2026-04-27 18:55:21]   [-] Falta: set protocols ospf area 0 network '192.168.0.0/16'
+[2026-04-27 18:55:21] [*] Reparando configuración de 192.168.1.1...
+[2026-04-27 18:56:58] [ERROR] Fallo con 192.168.1.1: 
+
+Pattern not detected: '(?:admin@vyos.*$|#.*$)' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:56:58] [DRIFT] Analizando 10.0.12.2...
+[2026-04-27 18:57:12] [ALERT] Drift detectado en 10.0.12.2:
+[2026-04-27 18:57:12]   [+] Sobra: set traffic-policy shaper BANDA bandwidth '10mbit'
+[2026-04-27 18:57:12]   [+] Sobra: set traffic-policy shaper BANDA default queue-type 'fair-queue'
+[2026-04-27 18:57:12]   [+] Sobra: set traffic-policy shaper BANDA default burst '15k'
+[2026-04-27 18:57:12]   [+] Sobra: set traffic-policy shaper BANDA default bandwidth '10mbit'
+[2026-04-27 18:57:12] [*] Reparando configuración de 10.0.12.2...
+[2026-04-27 18:57:33] [ERROR] Fallo con 10.0.12.2: 
+
+Pattern not detected: '(\\$|\\#|>)' in output.
+
+Things you might try to fix this:
+1. Adjust the regex pattern to better identify the terminating string. Note, in
+many situations the pattern is automatically based on the network device's prompt.
+2. Increase the read_timeout to a larger value.
+
+You can also look at the Netmiko session_log or debug log for more information.
+
+
+[2026-04-27 18:57:33] [DRIFT] Analizando 10.0.13.3...

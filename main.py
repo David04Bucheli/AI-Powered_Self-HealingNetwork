@@ -1,84 +1,161 @@
-import time
-import re
-import os
-from ai_engine import get_ai_remediation
-from devices import all_devices
-from network_driver import apply_ai_commands, get_vyos_config, apply_repair, get_vyos_stats
-from drift_engine import detect_drift
+# main.py  —  Sistema de Auto-Reparación NetDevOps con IA (VyOS)
+# Combina detección de drift de configuración + detección de congestión con IA
 
-POLLING_TIME = 60       # espera entre ciclos 
+import time
+import os
+import json
+from datetime import datetime
+
+from devices import all_devices
+from network_driver import get_vyos_config, apply_repair
+from drift_engine import detect_drift
+from congestion_monitor import collect_metrics
+from ai_advisor import query_ai
+
+# ── Configuración global ──────────────────────────────────────────────────────
+POLLING_TIME = 60      # segundos entre ciclos completos
+CONGESTION_CYCLES = 2       # cada cuántos ciclos se corre el análisis de congestión
+APPLY_AI_COMMANDS = False   # True = aplica comandos de la IA automáticamente (¡cuidado!)
+LOG_FILE = "selfhealing.log"
+
+_cycle_count = 0
+
+
+def log(msg: str):
+    """Imprime con timestamp y escribe en log."""
+    ts  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    out = f"[{ts}] {msg}"
+    print(out)
+    with open(LOG_FILE, "a") as f:
+        f.write(out + "\n")
+
+
+def handle_drift(device: dict):
+    """Detecta y repara drift de configuración (lógica original)."""
+    ip         = device['host']
+    master_cfg = f"master_configs/{ip}_master.txt"
+
+    if not os.path.exists(master_cfg):
+        log(f"[!] No se encontró archivo maestro para {ip}")
+        return
+
+    current_config = get_vyos_config(device)
+    missing, extra = detect_drift(master_cfg, current_config)
+
+    if missing or extra:
+        log(f"[ALERT] Drift detectado en {ip}:")
+        for e in extra:
+            log(f"  [+] Sobra: {e}")
+        for m in missing:
+            log(f"  [-] Falta: {m}")
+
+        repair_commands = []
+        for e in extra:
+            repair_commands.append(e.replace("set", "delete", 1))
+        for m in missing:
+            repair_commands.append(m)
+
+        log(f"[*] Reparando configuración de {ip}...")
+        apply_repair(device, repair_commands)
+        log(f"[OK] {ip} restaurado.")
+    else:
+        log(f"[OK] {ip} sin drift de configuración.")
+
+
+def handle_congestion(device: dict):
+    """
+    Recolecta métricas de congestión, consulta a la IA y
+    opcionalmente aplica los comandos sugeridos.
+    """
+    ip = device['host']
+    log(f"[AI] Recolectando métricas de congestión en {ip}...")
+
+    metrics = collect_metrics(device)
+
+    if not metrics['anomalies']:
+        log(f"[AI] {ip} — Sin anomalías de congestión detectadas.")
+        return
+
+    # Hay anomalías: consultar a la IA
+    log(f"[AI] {ip} — {len(metrics['anomalies'])} anomalía(s) detectada(s). Consultando IA...")
+    for a in metrics['anomalies']:
+        log(f"      ↳ [{a['type']}] {a['detail']}")
+
+    ai_response = query_ai(metrics)
+
+    # Mostrar razonamiento de la IA
+    severity    = ai_response.get('severity', 'unknown')
+    reasoning   = ai_response.get('reasoning', '')
+    commands    = ai_response.get('commands', [])
+    explanation = ai_response.get('explanation', '')
+
+    log(f"[AI] Severidad evaluada: {severity.upper()}")
+    log(f"[AI] Razonamiento: {reasoning}")
+    log(f"[AI] Explicación de comandos: {explanation}")
+
+    if commands:
+        log(f"[AI] Comandos de mitigación sugeridos ({len(commands)}):")
+        for cmd in commands:
+            log(f"      → {cmd}")
+
+        if APPLY_AI_COMMANDS:
+            log(f"[AI] Aplicando comandos de mitigación en {ip}...")
+            apply_repair(device, commands)
+            log(f"[AI] Comandos aplicados en {ip}.")
+        else:
+            log(f"[AI] APPLY_AI_COMMANDS=False — comandos NO aplicados (modo auditoría).")
+    else:
+        log(f"[AI] La IA no sugirió comandos adicionales.")
+
+    # Guardar reporte JSON para el dashboard
+    report = {
+        "timestamp": datetime.now().isoformat(),
+        "host":      ip,
+        "metrics":   metrics,
+        "ai":        ai_response,
+    }
+    report_path = f"reports/{ip.replace('.', '_')}_latest.json"
+    os.makedirs("reports", exist_ok=True)
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+    log(f"[AI] Reporte guardado en {report_path}")
+
 
 def start_self_healing():
-    print("="*50)
-    print("   SISTEMA DE AUTO-REPARACIÓN NETDEVOPS (VyOS)   ")
-    print("="*50)
-    
+    global _cycle_count
+
+    log("=" * 55)
+    log("   SISTEMA AUTO-REPARACIÓN NetDevOps + IA  (VyOS)   ")
+    log("=" * 55)
+    log(f"Dispositivos: {[d['host'] for d in all_devices]}")
+    log(f"Polling: cada {POLLING_TIME}s | Análisis IA: cada {CONGESTION_CYCLES} ciclos")
+    log(f"Aplicar comandos IA: {'SÍ' if APPLY_AI_COMMANDS else 'NO (modo auditoría)'}")
+    log("")
+
     while True:
+        _cycle_count += 1
+        log(f"{'─'*20} Ciclo #{_cycle_count} {'─'*20}")
+
+        run_congestion = (_cycle_count % CONGESTION_CYCLES == 0)
+
         for device in all_devices:
             ip = device['host']
-            master_cfg = f"master_configs/{ip}_master.txt"
-            
-            # existencia de router
-            if not os.path.exists(master_cfg):
-                print(f"[!] Error: No se encontró archivo maestro para {ip}")
-                continue
-
             try:
-                print(f"\n[*] Analizando {ip}...")
-                current_config = get_vyos_config(device)
-                
-                # comandos faltantes y sobrantes
-                missing, extra = detect_drift(master_cfg, current_config)
-                
-                if missing or extra:
-                    print(f"[ALERT] Anomalía detectada en el router {ip}:")
-                    
-                    if extra:       # hay comandos de mas
-                        for e in extra:
-                            print(f"  [+] Sobra/Cambio: {e}")
-                    if missing:     # faltan comandos
-                        for m in missing:
-                            print(f"  [-] Falta: {m}")
-                    
-                    # reparar - eliminar extra y agregar faltantes
-                    repair_commands = []
-                    for e in extra:
-                        repair_commands.append(e.replace("set", "delete"))      # eliminamos comandos
-                    
-                    for m in missing:
-                        repair_commands.append(m)
+                # Siempre: detección de drift
+                log(f"[DRIFT] Analizando {ip}...")
+                handle_drift(device)
 
-                    print("[*] Iniciando proceso de restauración automática...")
-                    apply_repair(device, repair_commands)
-                    print(f"[OK] {ip} ha vuelto a su estado original.")
-                
-                else:
-                    print(f"[OK] {ip} se encuentra en cumplimiento (Sin drift).")
+                # Cada N ciclos: análisis de congestión con IA
+                if run_congestion:
+                    handle_congestion(device)
 
-                # Esto soluciona congestión o tráfico excesivo.
-                print(f"[*] Extrayendo telemetría de {ip}...")
-                telemetry = get_vyos_stats(device)
-                anomalia = re.findall(r"(errors|dropped|overrun)\s+([1-9]\d*)", telemetry)
-                
-                # Criterio simple: Si hay palabras de alerta en la telemetría, consultamos a la IA
-                if anomalia:
-                    print(f"[!] Anomalía de tráfico detectada. Consultando a la IA...")
-                    ai_advice = get_ai_remediation(telemetry)
-                    
-                    if ai_advice:
-                        print(f"[AI DECISION] Aplicando medidas de mitigación sugeridas:")
-                        for cmd in ai_advice: print(f"  > {cmd}")
-                        apply_ai_commands(device, ai_advice)
-                else:
-                    print(f"[OK] Rendimiento de {ip} dentro de los parámetros normales.")
-                    
-            except Exception as e:      # reportamos errores
-                print(f"[ERROR] Fallo de conexión con {ip}: {e}")
+            except Exception as e:
+                log(f"[ERROR] Fallo con {ip}: {e}")
 
-        print(f"\n" + "-"*30)
-        print(f"Ciclo completado. Próximo polling en {POLLING_TIME} segundos.")
-        print("-"*30 + "\n")
+        log(f"\nCiclo #{_cycle_count} completado. Próximo en {POLLING_TIME}s.")
+        log("─" * 55 + "\n")
         time.sleep(POLLING_TIME)
+
 
 if __name__ == "__main__":
     start_self_healing()
