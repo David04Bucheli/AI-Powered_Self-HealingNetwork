@@ -1,14 +1,14 @@
-# congestion_monitor.py
 """
-Módulo de monitoreo de congestión para routers VyOS.
-Recolecta métricas: RTT, packet loss, estadísticas de interfaces.
+Monitorea congestion de los routers VYOS, consulta
+- RTT
+- Paquetes perdidos
+- Jitter
 """
 
 import re
 from dataclasses import dataclass
 from typing import Optional
 from netmiko import ConnectHandler
-
 
 @dataclass
 class InterfaceStats:
@@ -23,7 +23,6 @@ class InterfaceStats:
     rx_errors: int
     tx_errors: int
 
-
 @dataclass
 class PingResult:
     """Resultado de un ping a un destino."""
@@ -31,11 +30,12 @@ class PingResult:
     packets_sent: int
     packets_received: int
     packet_loss_percent: float
-    rtt_min: float      # ms
-    rtt_avg: float      # ms
-    rtt_max: float      # ms
-    rtt_mdev: float     # ms (desviación estándar - indica jitter)
-
+    
+    # todo en ms
+    rtt_min: float
+    rtt_avg: float
+    rtt_max: float
+    rtt_mdev: float
 
 @dataclass 
 class CongestionMetrics:
@@ -54,31 +54,31 @@ class CongestionMetrics:
         """
         issues = []
         
-        # Verificar packet loss en pings
+        # verificar packet loss en pings
         for ping in self.ping_results:
             if ping.packet_loss_percent > 5:
                 issues.append(
                     f"Alto packet loss ({ping.packet_loss_percent}%) hacia {ping.destination}"
                 )
-            # RTT alto (> 100ms indica posible congestión)
-            if ping.rtt_avg > 100:
+            # RTT alto
+            if ping.rtt_avg > 55:
                 issues.append(
                     f"RTT elevado ({ping.rtt_avg:.2f}ms) hacia {ping.destination}"
                 )
-            # Jitter alto (mdev > 50ms)
-            if ping.rtt_mdev > 50:
+            # jitter alto
+            if ping.rtt_mdev > 20:
                 issues.append(
                     f"Alto jitter ({ping.rtt_mdev:.2f}ms) hacia {ping.destination}"
                 )
         
-        # Verificar drops en interfaces
+        # verificar drops en interfaces
         for iface in self.interfaces:
             total_dropped = iface.rx_dropped + iface.tx_dropped
             total_errors = iface.rx_errors + iface.tx_errors
             
             if total_dropped > 100:
                 issues.append(
-                    f"Paquetes dropped en {iface.name}: RX={iface.rx_dropped}, TX={iface.tx_dropped}"
+                    f"Paquetes dropeados en {iface.name}: RX={iface.rx_dropped}, TX={iface.tx_dropped}"
                 )
             if total_errors > 50:
                 issues.append(
@@ -96,13 +96,6 @@ def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
     output = ssh_conn.send_command("show interfaces detail", expect_string=r"[\$#]")
     interfaces = []
     
-    # Parsear salida de VyOS - formato típico:
-    # eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ...
-    #     RX:  bytes    packets     errors    dropped    overrun      mcast
-    #          123456   1234        0         0          0            0
-    #     TX:  bytes    packets     errors    dropped    carrier collisions
-    #          654321   4321        0         0          0       0
-    
     current_iface = None
     rx_line_next = False
     tx_line_next = False
@@ -110,10 +103,10 @@ def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
     tx_data = {}
     
     for line in output.splitlines():
-        # Detectar nombre de interfaz
+        # detectar nombre de interfaz
         iface_match = re.match(r'^(eth\d+):', line)
         if iface_match:
-            # Guardar interfaz anterior si existe
+            # guardar interfaz anterior si existe
             if current_iface and rx_data and tx_data:
                 interfaces.append(InterfaceStats(
                     name=current_iface,
@@ -131,7 +124,7 @@ def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
             tx_data = {}
             continue
         
-        # Detectar línea de encabezado RX/TX
+        # detectar línea de encabezado RX/TX
         if 'RX:' in line and 'bytes' in line:
             rx_line_next = True
             continue
@@ -139,7 +132,7 @@ def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
             tx_line_next = True
             continue
         
-        # Parsear datos RX
+        # datos RX
         if rx_line_next:
             numbers = re.findall(r'\d+', line)
             if len(numbers) >= 5:
@@ -152,7 +145,7 @@ def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
             rx_line_next = False
             continue
         
-        # Parsear datos TX
+        # datos TX
         if tx_line_next:
             numbers = re.findall(r'\d+', line)
             if len(numbers) >= 5:
@@ -165,7 +158,7 @@ def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
             tx_line_next = False
             continue
     
-    # No olvidar la última interfaz
+    # ultima interfaz
     if current_iface and rx_data and tx_data:
         interfaces.append(InterfaceStats(
             name=current_iface,
@@ -190,13 +183,8 @@ def ping_from_router(ssh_conn, destination: str, count: int = 10) -> Optional[Pi
     output = ssh_conn.send_command(
         f"ping {destination} count {count}",
         expect_string=r"[\$#]",
-        read_timeout=30  # pings pueden tomar tiempo
+        read_timeout=30     # pings pueden tomar tiempo
     )
-    
-    # Parsear salida de ping en VyOS/Linux:
-    # --- 10.0.12.1 ping statistics ---
-    # 10 packets transmitted, 10 received, 0% packet loss, time 9012ms
-    # rtt min/avg/max/mdev = 0.123/0.456/0.789/0.111 ms
     
     result = PingResult(
         destination=destination,
@@ -210,7 +198,7 @@ def ping_from_router(ssh_conn, destination: str, count: int = 10) -> Optional[Pi
     )
     
     for line in output.splitlines():
-        # Buscar línea de packet loss
+        # buscar paquetes perdidos
         loss_match = re.search(
             r'(\d+) packets transmitted, (\d+) received.*?(\d+(?:\.\d+)?)% packet loss',
             line
@@ -221,7 +209,7 @@ def ping_from_router(ssh_conn, destination: str, count: int = 10) -> Optional[Pi
             result.packet_loss_percent = float(loss_match.group(3))
             continue
         
-        # Buscar línea de RTT
+        # buscar RTT
         rtt_match = re.search(
             r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)',
             line
@@ -239,7 +227,7 @@ def get_ospf_neighbor_count(ssh_conn) -> int:
     """Cuenta el número de vecinos OSPF activos."""
     output = ssh_conn.send_command("show ip ospf neighbor", expect_string=r"[\$#]")
     
-    # Contar líneas que contengan estado "Full" (vecino completamente establecido)
+    # contar líneas "Full" (vecino completamente)
     full_neighbors = len(re.findall(r'\bFull\b', output, re.IGNORECASE))
     return full_neighbors
 
@@ -260,17 +248,17 @@ def collect_congestion_metrics(device_params: dict, ping_targets: list[str]) -> 
     with ConnectHandler(**device_params) as ssh:
         ssh.find_prompt()
         
-        # Recolectar estadísticas de interfaces
+        # recolectar estadísticas de interfaces
         interfaces = get_interface_stats(ssh)
         
-        # Hacer pings a los destinos especificados
+        # pings a destinos definidos
         ping_results = []
         for target in ping_targets:
             result = ping_from_router(ssh, target, count=10)
             if result:
                 ping_results.append(result)
         
-        # Contar vecinos OSPF
+        # contar vecinos OSPF
         ospf_neighbors = get_ospf_neighbor_count(ssh)
         
         return CongestionMetrics(
@@ -312,7 +300,7 @@ def format_metrics_for_ai(metrics: CongestionMetrics) -> str:
             f"max={ping.rtt_max:.2f}, mdev(jitter)={ping.rtt_mdev:.2f}",
         ])
     
-    # Agregar análisis de problemas
+    # agregar análisis de problemas
     has_issues, issues = metrics.has_congestion_indicators()
     if has_issues:
         lines.extend(["", "--- PROBLEMAS DETECTADOS ---"])

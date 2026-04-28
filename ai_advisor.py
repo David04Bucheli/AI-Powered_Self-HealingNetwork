@@ -1,5 +1,9 @@
-# ai_advisor.py
 """
+Sistema de monitoreo mediante IA, usa API de NVIDIA como OPEN AI
+- Severidad del problema
+- Analisis
+- Posibles soluciones
+- Rollback
 Módulo de asesoría de IA para mitigación de congestión en redes VyOS.
 Usa la API de OpenAI para analizar métricas y generar comandos de mitigación.
 """
@@ -10,16 +14,15 @@ from dataclasses import dataclass
 from openai import OpenAI
 from congestion_monitor import CongestionMetrics, format_metrics_for_ai
 
-
 @dataclass
 class AIRecommendation:
     """Recomendación de la IA para mitigar congestión."""
-    analysis: str               # Análisis del problema
-    severity: str               # "low", "medium", "high", "critical"
-    commands: list[str]         # Comandos VyOS a ejecutar
-    reasoning: str              # Explicación de por qué estos comandos
-    rollback_commands: list[str]  # Comandos para revertir si algo sale mal
-    requires_human_approval: bool  # Si es muy crítico, pedir aprobación
+    analysis: str       # problema
+    severity: str       # low - medium - high - critical
+    commands: list[str]     # comandos VyOS a ejecutar
+    reasoning: str      # explicación de por qué estos comandos
+    rollback_commands: list[str]        # comandos para revertir si algo sale mal
+    requires_human_approval: bool       # comando critico, consultar antes de aplicar
 
 
 # Prompt del sistema que define el comportamiento de la IA
@@ -40,8 +43,8 @@ MÉTRICAS QUE RECIBIRÁS:
 INDICADORES DE CONGESTIÓN:
 - Packet loss > 5% = congestión moderada
 - Packet loss > 20% = congestión severa
-- RTT > 100ms = latencia alta
-- RTT mdev (jitter) > 50ms = inestabilidad
+- RTT > 55ms = latencia alta
+- RTT mdev (jitter) > 20ms = inestabilidad
 - Dropped packets > 100 = cola de interfaz saturada
 - Errores de interfaz = posible problema de capa física
 
@@ -86,8 +89,8 @@ FORMATO DE RESPUESTA (JSON):
 
 def get_ai_recommendation(
     metrics: CongestionMetrics,
-    api_key: str = None,
-    model: str = "gpt-4o-mini"
+    api_key: str = "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",
+    model: str = "moonshotai/kimi-k2-thinking"
 ) -> AIRecommendation:
     """
     Envía métricas de congestión a OpenAI y obtiene recomendaciones.
@@ -100,12 +103,15 @@ def get_ai_recommendation(
     Returns:
         AIRecommendation con análisis y comandos
     """
-    # Usar API key del parámetro o del entorno
-    api_key = api_key or os.getenv("OPENAI_API_KEY")
+
+    api_key = "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"
     if not api_key:
         raise ValueError("Se requiere OPENAI_API_KEY en el entorno o como parámetro")
-    
-    client = OpenAI(api_key=api_key)
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://integrate.api.nvidia.com/v1"
+    )
     
     # Formatear métricas para la IA
     metrics_text = format_metrics_for_ai(metrics)
@@ -121,15 +127,15 @@ def get_ai_recommendation(
 
 Por favor responde ÚNICAMENTE con JSON válido siguiendo el formato especificado."""
 
-    # Llamar a la API de OpenAI
+    # client modelo
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
         ],
-        temperature=0.3,  # Baja temperatura para respuestas más consistentes
-        response_format={"type": "json_object"}  # Forzar respuesta JSON
+        temperature=0.3,  # baja temperatura -> respuestas más consistentes
+        response_format={"type": "json_object"}  # forzar respuesta JSON
     )
     
     # Parsear respuesta JSON
@@ -149,21 +155,21 @@ Por favor responde ÚNICAMENTE con JSON válido siguiendo el formato especificad
 def print_recommendation(rec: AIRecommendation, router_ip: str):
     """Imprime la recomendación de forma legible."""
     severity_colors = {
-        "low": "🟢",
-        "medium": "🟡", 
-        "high": "🟠",
-        "critical": "🔴"
+        "bajo": "🟢",
+        "medio": "🟡", 
+        "alto": "🟠",
+        "critico": "🔴"
     }
     
     icon = severity_colors.get(rec.severity, "⚪")
     
     print("\n" + "="*60)
-    print(f"🤖 ANÁLISIS DE IA - Router {router_ip}")
+    print(f"ANÁLISIS DE IA - Router {router_ip}")
     print("="*60)
     print(f"\n{icon} Severidad: {rec.severity.upper()}")
-    print(f"\n📊 Análisis:")
+    print(f"\nAnálisis:")
     print(f"   {rec.analysis}")
-    print(f"\n💡 Razonamiento:")
+    print(f"\nRazonamiento:")
     print(f"   {rec.reasoning}")
     
     if rec.commands:
@@ -171,15 +177,15 @@ def print_recommendation(rec: AIRecommendation, router_ip: str):
         for cmd in rec.commands:
             print(f"   • {cmd}")
     else:
-        print(f"\n✅ No se requieren comandos de mitigación")
+        print(f"\nNo se requieren comandos de mitigación")
     
     if rec.rollback_commands:
-        print(f"\n↩️  Comandos de rollback (si hay problemas):")
+        print(f"\nComandos de rollback (si hay problemas):")
         for cmd in rec.rollback_commands:
             print(f"   • {cmd}")
     
     if rec.requires_human_approval:
-        print(f"\n⚠️  REQUIERE APROBACIÓN HUMANA antes de ejecutar")
+        print(f"\nREQUIERE APROBACIÓN HUMANA antes de ejecutar")
     
     print("="*60 + "\n")
 
@@ -202,9 +208,9 @@ def apply_ai_recommendation(device_params: dict, rec: AIRecommendation, auto_app
         print("[INFO] No hay comandos que aplicar")
         return False
     
-    # Si requiere aprobación humana, siempre preguntar
+    # aprobacion manual
     if rec.requires_human_approval:
-        print("\n⚠️  La IA recomienda aprobación humana para estos cambios.")
+        print("\nLa IA recomienda aprobación humana para estos cambios.")
         print("Comandos propuestos:")
         for cmd in rec.commands:
             print(f"  • {cmd}")
@@ -214,7 +220,7 @@ def apply_ai_recommendation(device_params: dict, rec: AIRecommendation, auto_app
             print("[INFO] Comandos NO aplicados por decisión del usuario")
             return False
     
-    # Si no es auto_apply, preguntar
+    # preguntar antes de implementar
     elif not auto_apply:
         print("\nComandos propuestos:")
         for cmd in rec.commands:
@@ -225,7 +231,7 @@ def apply_ai_recommendation(device_params: dict, rec: AIRecommendation, auto_app
             print("[INFO] Comandos NO aplicados por decisión del usuario")
             return False
     
-    # Aplicar comandos
+    # aplicar comandos
     try:
         print(f"\n[*] Aplicando {len(rec.commands)} comandos de mitigación...")
         apply_repair(device_params, rec.commands)
@@ -234,7 +240,7 @@ def apply_ai_recommendation(device_params: dict, rec: AIRecommendation, auto_app
     except Exception as e:
         print(f"[ERROR] Fallo al aplicar comandos: {e}")
         
-        # Intentar rollback si hay comandos de rollback
+        # intentar rollback si hay comandos de rollback
         if rec.rollback_commands:
             print("[*] Intentando rollback...")
             try:
