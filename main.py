@@ -1,161 +1,219 @@
-# main.py  —  Sistema de Auto-Reparación NetDevOps con IA (VyOS)
-# Combina detección de drift de configuración + detección de congestión con IA
+# main_with_ai.py
+"""
+Sistema de Auto-Reparación NetDevOps con IA.
+Combina detección de drift de configuración + monitoreo de congestión con IA.
+"""
 
 import time
 import os
-import json
-from datetime import datetime
-
 from devices import all_devices
 from network_driver import get_vyos_config, apply_repair
 from drift_engine import detect_drift
-from congestion_monitor import collect_metrics
-from ai_advisor import query_ai
-
-# ── Configuración global ──────────────────────────────────────────────────────
-POLLING_TIME = 60      # segundos entre ciclos completos
-CONGESTION_CYCLES = 2       # cada cuántos ciclos se corre el análisis de congestión
-APPLY_AI_COMMANDS = False   # True = aplica comandos de la IA automáticamente (¡cuidado!)
-LOG_FILE = "selfhealing.log"
-
-_cycle_count = 0
+from congestion_monitor import collect_congestion_metrics, format_metrics_for_ai
+from ai_advisor import get_ai_recommendation, print_recommendation, apply_ai_recommendation
 
 
-def log(msg: str):
-    """Imprime con timestamp y escribe en log."""
-    ts  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    out = f"[{ts}] {msg}"
-    print(out)
-    with open(LOG_FILE, "a") as f:
-        f.write(out + "\n")
+# Configuración
+POLLING_TIME = 60                   # segundos entre ciclos
+CONGESTION_CHECK_INTERVAL = 3       # cada N ciclos, revisar congestión
+AUTO_APPLY_AI_COMMANDS = False      # si True, aplica comandos de IA automáticamente (peligroso!)
+
+# Definir a qué IPs hacer ping desde cada router para medir congestión
+# Cada router hace ping a los otros routers y sus VPCs
+PING_TARGETS = {
+    '192.168.1.1': ['10.0.12.2', '10.0.13.3', '192.168.2.1', '192.168.3.1'],  # R1 -> R2, R3, VPC2, VPC3
+    '10.0.12.2':   ['192.168.1.1', '10.0.23.3', '192.168.1.1', '192.168.3.1'],  # R2 -> R1, R3, VPC1, VPC3
+    '10.0.13.3':   ['192.168.1.1', '10.0.23.2', '192.168.1.1', '192.168.2.1'],  # R3 -> R1, R2, VPC1, VPC2
+}
 
 
-def handle_drift(device: dict):
-    """Detecta y repara drift de configuración (lógica original)."""
-    ip         = device['host']
+def check_configuration_drift(device):
+    """Verifica y repara drift de configuración."""
+    ip = device['host']
     master_cfg = f"master_configs/{ip}_master.txt"
-
+    
     if not os.path.exists(master_cfg):
-        log(f"[!] No se encontró archivo maestro para {ip}")
-        return
+        print(f"[!] Error: No se encontró archivo maestro para {ip}")
+        return False
 
-    current_config = get_vyos_config(device)
-    missing, extra = detect_drift(master_cfg, current_config)
+    try:
+        print(f"\n[*] Verificando configuración de {ip}...")
+        current_config = get_vyos_config(device)
+        
+        missing, extra = detect_drift(master_cfg, current_config)
+        
+        if missing or extra:
+            print(f"[ALERT] Anomalía de configuración en {ip}:")
+            
+            if extra:
+                for e in extra:
+                    print(f"  [+] Sobra/Cambio: {e}")
+            if missing:
+                for m in missing:
+                    print(f"  [-] Falta: {m}")
+            
+            repair_commands = []
+            for e in extra:
+                repair_commands.append(e.replace("set", "delete"))
+            for m in missing:
+                repair_commands.append(m)
 
-    if missing or extra:
-        log(f"[ALERT] Drift detectado en {ip}:")
-        for e in extra:
-            log(f"  [+] Sobra: {e}")
-        for m in missing:
-            log(f"  [-] Falta: {m}")
+            print("[*] Restaurando configuración original...")
+            apply_repair(device, repair_commands)
+            print(f"[OK] {ip} restaurado a configuración maestra.")
+            return True
+        else:
+            print(f"[OK] {ip} - Configuración en cumplimiento.")
+            return True
 
-        repair_commands = []
-        for e in extra:
-            repair_commands.append(e.replace("set", "delete", 1))
-        for m in missing:
-            repair_commands.append(m)
-
-        log(f"[*] Reparando configuración de {ip}...")
-        apply_repair(device, repair_commands)
-        log(f"[OK] {ip} restaurado.")
-    else:
-        log(f"[OK] {ip} sin drift de configuración.")
+    except Exception as e:
+        print(f"[ERROR] Fallo de conexión con {ip}: {e}")
+        return False
 
 
-def handle_congestion(device: dict):
+def check_congestion_with_ai(device):
     """
-    Recolecta métricas de congestión, consulta a la IA y
-    opcionalmente aplica los comandos sugeridos.
+    Monitorea congestión y consulta IA para mitigación.
     """
     ip = device['host']
-    log(f"[AI] Recolectando métricas de congestión en {ip}...")
-
-    metrics = collect_metrics(device)
-
-    if not metrics['anomalies']:
-        log(f"[AI] {ip} — Sin anomalías de congestión detectadas.")
+    ping_targets = PING_TARGETS.get(ip, [])
+    
+    if not ping_targets:
+        print(f"[!] No hay targets de ping definidos para {ip}")
         return
-
-    # Hay anomalías: consultar a la IA
-    log(f"[AI] {ip} — {len(metrics['anomalies'])} anomalía(s) detectada(s). Consultando IA...")
-    for a in metrics['anomalies']:
-        log(f"      ↳ [{a['type']}] {a['detail']}")
-
-    ai_response = query_ai(metrics)
-
-    # Mostrar razonamiento de la IA
-    severity    = ai_response.get('severity', 'unknown')
-    reasoning   = ai_response.get('reasoning', '')
-    commands    = ai_response.get('commands', [])
-    explanation = ai_response.get('explanation', '')
-
-    log(f"[AI] Severidad evaluada: {severity.upper()}")
-    log(f"[AI] Razonamiento: {reasoning}")
-    log(f"[AI] Explicación de comandos: {explanation}")
-
-    if commands:
-        log(f"[AI] Comandos de mitigación sugeridos ({len(commands)}):")
-        for cmd in commands:
-            log(f"      → {cmd}")
-
-        if APPLY_AI_COMMANDS:
-            log(f"[AI] Aplicando comandos de mitigación en {ip}...")
-            apply_repair(device, commands)
-            log(f"[AI] Comandos aplicados en {ip}.")
-        else:
-            log(f"[AI] APPLY_AI_COMMANDS=False — comandos NO aplicados (modo auditoría).")
-    else:
-        log(f"[AI] La IA no sugirió comandos adicionales.")
-
-    # Guardar reporte JSON para el dashboard
-    report = {
-        "timestamp": datetime.now().isoformat(),
-        "host":      ip,
-        "metrics":   metrics,
-        "ai":        ai_response,
-    }
-    report_path = f"reports/{ip.replace('.', '_')}_latest.json"
-    os.makedirs("reports", exist_ok=True)
-    with open(report_path, "w") as f:
-        json.dump(report, f, indent=2)
-    log(f"[AI] Reporte guardado en {report_path}")
-
-
-def start_self_healing():
-    global _cycle_count
-
-    log("=" * 55)
-    log("   SISTEMA AUTO-REPARACIÓN NetDevOps + IA  (VyOS)   ")
-    log("=" * 55)
-    log(f"Dispositivos: {[d['host'] for d in all_devices]}")
-    log(f"Polling: cada {POLLING_TIME}s | Análisis IA: cada {CONGESTION_CYCLES} ciclos")
-    log(f"Aplicar comandos IA: {'SÍ' if APPLY_AI_COMMANDS else 'NO (modo auditoría)'}")
-    log("")
-
-    while True:
-        _cycle_count += 1
-        log(f"{'─'*20} Ciclo #{_cycle_count} {'─'*20}")
-
-        run_congestion = (_cycle_count % CONGESTION_CYCLES == 0)
-
-        for device in all_devices:
-            ip = device['host']
+    
+    print(f"\n[*] 📊 Analizando congestión en {ip}...")
+    
+    try:
+        # Recolectar métricas
+        metrics = collect_congestion_metrics(device, ping_targets)
+        
+        # Verificar si hay indicadores de congestión
+        has_issues, issues = metrics.has_congestion_indicators()
+        
+        if has_issues:
+            print(f"[ALERT] ⚠️  Indicadores de congestión detectados en {ip}:")
+            for issue in issues:
+                print(f"    • {issue}")
+            
+            # Consultar a la IA
+            print(f"\n[*] 🤖 Consultando IA para recomendaciones...")
+            
             try:
-                # Siempre: detección de drift
-                log(f"[DRIFT] Analizando {ip}...")
-                handle_drift(device)
+                recommendation = get_ai_recommendation(metrics)
+                print_recommendation(recommendation, ip)
+                
+                # Aplicar si hay comandos y está habilitado o es de baja severidad
+                if recommendation.commands:
+                    apply_ai_recommendation(
+                        device, 
+                        recommendation, 
+                        auto_apply=AUTO_APPLY_AI_COMMANDS
+                    )
+            
+            except Exception as ai_error:
+                print(f"[ERROR] Fallo al consultar IA: {ai_error}")
+                print("[INFO] Continando sin recomendaciones de IA...")
+        
+        else:
+            print(f"[OK] {ip} - Sin indicadores de congestión")
+            # Opcional: mostrar métricas resumidas
+            for ping in metrics.ping_results:
+                print(f"    📶 {ping.destination}: RTT={ping.rtt_avg:.1f}ms, Loss={ping.packet_loss_percent}%")
+    
+    except Exception as e:
+        print(f"[ERROR] Fallo al monitorear congestión en {ip}: {e}")
 
-                # Cada N ciclos: análisis de congestión con IA
-                if run_congestion:
-                    handle_congestion(device)
 
-            except Exception as e:
-                log(f"[ERROR] Fallo con {ip}: {e}")
-
-        log(f"\nCiclo #{_cycle_count} completado. Próximo en {POLLING_TIME}s.")
-        log("─" * 55 + "\n")
+def start_self_healing_with_ai():
+    """
+    Loop principal que combina:
+    1. Detección de drift de configuración (cada ciclo)
+    2. Monitoreo de congestión con IA (cada N ciclos)
+    """
+    print("="*60)
+    print("   SISTEMA DE AUTO-REPARACIÓN NETDEVOPS CON IA (VyOS)   ")
+    print("="*60)
+    
+    # Verificar API key de OpenAI
+    if not os.getenv("OPENAI_API_KEY"):
+        print("\n[!] ADVERTENCIA: OPENAI_API_KEY no configurada")
+        print("[!] El análisis de congestión con IA no estará disponible")
+        print("[!] Configura la variable de entorno: export OPENAI_API_KEY='tu-api-key'")
+        ai_enabled = False
+    else:
+        print("\n[OK] OpenAI API key detectada - IA habilitada")
+        ai_enabled = True
+    
+    print(f"\n[CONFIG] Polling cada {POLLING_TIME} segundos")
+    print(f"[CONFIG] Análisis de congestión cada {CONGESTION_CHECK_INTERVAL} ciclos")
+    print(f"[CONFIG] Auto-aplicar comandos de IA: {'SÍ ⚠️' if AUTO_APPLY_AI_COMMANDS else 'NO (manual)'}")
+    
+    cycle_count = 0
+    
+    while True:
+        cycle_count += 1
+        print(f"\n{'='*60}")
+        print(f"   CICLO #{cycle_count}")
+        print(f"{'='*60}")
+        
+        # 1. Verificar drift de configuración en todos los routers
+        print("\n" + "-"*40)
+        print("   FASE 1: Verificación de Configuración")
+        print("-"*40)
+        
+        for device in all_devices:
+            check_configuration_drift(device)
+        
+        # 2. Monitoreo de congestión (cada N ciclos)
+        if ai_enabled and (cycle_count % CONGESTION_CHECK_INTERVAL == 0):
+            print("\n" + "-"*40)
+            print("   FASE 2: Análisis de Congestión con IA")
+            print("-"*40)
+            
+            for device in all_devices:
+                check_congestion_with_ai(device)
+        
+        # Esperar siguiente ciclo
+        print(f"\n" + "-"*40)
+        print(f"Ciclo #{cycle_count} completado.")
+        if ai_enabled:
+            next_ai = CONGESTION_CHECK_INTERVAL - (cycle_count % CONGESTION_CHECK_INTERVAL)
+            print(f"Próximo análisis de congestión en {next_ai} ciclo(s).")
+        print(f"Siguiente polling en {POLLING_TIME} segundos...")
+        print("-"*40 + "\n")
+        
         time.sleep(POLLING_TIME)
 
 
+# Modo de prueba rápida de congestión
+def test_congestion_analysis():
+    """
+    Modo de prueba: analiza congestión una sola vez sin loop.
+    Útil para testing y demos.
+    """
+    print("="*60)
+    print("   MODO DE PRUEBA - Análisis de Congestión")
+    print("="*60)
+    
+    if not os.getenv("OPENAI_API_KEY"):
+        print("\n[ERROR] OPENAI_API_KEY no configurada")
+        print("Configura: export OPENAI_API_KEY='tu-api-key'")
+        return
+    
+    for device in all_devices:
+        print(f"\n{'='*40}")
+        print(f"Router: {device['host']}")
+        print(f"{'='*40}")
+        check_congestion_with_ai(device)
+    
+    print("\n[FIN] Prueba completada")
+
+
 if __name__ == "__main__":
-    start_self_healing()
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        test_congestion_analysis()
+    else:
+        start_self_healing_with_ai()

@@ -1,200 +1,324 @@
 # congestion_monitor.py
-# Recolecta métricas de congestión de routers VyOS vía Netmiko
-# Métricas elegidas por visibilidad en GNS3: interface counters, OSPF neighbors, queue drops
+"""
+Módulo de monitoreo de congestión para routers VyOS.
+Recolecta métricas: RTT, packet loss, estadísticas de interfaces.
+"""
 
 import re
+from dataclasses import dataclass
+from typing import Optional
 from netmiko import ConnectHandler
 
-# ── Umbrales configurables ──────────────────────────────────────────────────
-THRESHOLDS = {
-    'rx_errors_pct':   1.0,   # % de errores sobre paquetes totales
-    'tx_drops_pct':    1.0,   # % de drops sobre paquetes totales
-    'ospf_retx':       5,     # retransmisiones OSPF acumuladas (señal de saturación L3)
-    'load_pct':        70.0,  # % de utilización de interfaz (si hay rate disponible)
-}
 
-# ── Parsers VyOS ─────────────────────────────────────────────────────────────
+@dataclass
+class InterfaceStats:
+    """Estadísticas de una interfaz de red."""
+    name: str
+    rx_packets: int
+    tx_packets: int
+    rx_bytes: int
+    tx_bytes: int
+    rx_dropped: int
+    tx_dropped: int
+    rx_errors: int
+    tx_errors: int
 
-def _parse_interface_stats(raw: str) -> list[dict]:
+
+@dataclass
+class PingResult:
+    """Resultado de un ping a un destino."""
+    destination: str
+    packets_sent: int
+    packets_received: int
+    packet_loss_percent: float
+    rtt_min: float      # ms
+    rtt_avg: float      # ms
+    rtt_max: float      # ms
+    rtt_mdev: float     # ms (desviación estándar - indica jitter)
+
+
+@dataclass 
+class CongestionMetrics:
+    """Métricas completas de congestión para un router."""
+    router_ip: str
+    interfaces: list[InterfaceStats]
+    ping_results: list[PingResult]
+    ospf_neighbors: int
+    cpu_usage: Optional[float] = None
+    memory_usage: Optional[float] = None
+    
+    def has_congestion_indicators(self) -> tuple[bool, list[str]]:
+        """
+        Analiza las métricas y determina si hay indicadores de congestión.
+        Retorna (tiene_congestión, lista_de_razones).
+        """
+        issues = []
+        
+        # Verificar packet loss en pings
+        for ping in self.ping_results:
+            if ping.packet_loss_percent > 5:
+                issues.append(
+                    f"Alto packet loss ({ping.packet_loss_percent}%) hacia {ping.destination}"
+                )
+            # RTT alto (> 100ms indica posible congestión)
+            if ping.rtt_avg > 100:
+                issues.append(
+                    f"RTT elevado ({ping.rtt_avg:.2f}ms) hacia {ping.destination}"
+                )
+            # Jitter alto (mdev > 50ms)
+            if ping.rtt_mdev > 50:
+                issues.append(
+                    f"Alto jitter ({ping.rtt_mdev:.2f}ms) hacia {ping.destination}"
+                )
+        
+        # Verificar drops en interfaces
+        for iface in self.interfaces:
+            total_dropped = iface.rx_dropped + iface.tx_dropped
+            total_errors = iface.rx_errors + iface.tx_errors
+            
+            if total_dropped > 100:
+                issues.append(
+                    f"Paquetes dropped en {iface.name}: RX={iface.rx_dropped}, TX={iface.tx_dropped}"
+                )
+            if total_errors > 50:
+                issues.append(
+                    f"Errores en {iface.name}: RX={iface.rx_errors}, TX={iface.tx_errors}"
+                )
+        
+        return len(issues) > 0, issues
+
+
+def get_interface_stats(ssh_conn) -> list[InterfaceStats]:
     """
-    Parsea la salida de 'show interfaces' de VyOS.
-    Extrae: interfaz, estado, rx_packets, tx_packets, rx_errors, tx_drops.
+    Obtiene estadísticas de todas las interfaces ethernet.
+    Usa 'show interfaces ethernet' en VyOS.
     """
-    results = []
-    # Bloque por interfaz: línea con nombre + líneas de estadísticas
-    iface_blocks = re.split(r'\n(?=\S)', raw)
-
-    for block in iface_blocks:
-        lines = block.strip().splitlines()
-        if not lines:
+    output = ssh_conn.send_command("show interfaces detail", expect_string=r"[\$#]")
+    interfaces = []
+    
+    # Parsear salida de VyOS - formato típico:
+    # eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ...
+    #     RX:  bytes    packets     errors    dropped    overrun      mcast
+    #          123456   1234        0         0          0            0
+    #     TX:  bytes    packets     errors    dropped    carrier collisions
+    #          654321   4321        0         0          0       0
+    
+    current_iface = None
+    rx_line_next = False
+    tx_line_next = False
+    rx_data = {}
+    tx_data = {}
+    
+    for line in output.splitlines():
+        # Detectar nombre de interfaz
+        iface_match = re.match(r'^(eth\d+):', line)
+        if iface_match:
+            # Guardar interfaz anterior si existe
+            if current_iface and rx_data and tx_data:
+                interfaces.append(InterfaceStats(
+                    name=current_iface,
+                    rx_packets=rx_data.get('packets', 0),
+                    tx_packets=tx_data.get('packets', 0),
+                    rx_bytes=rx_data.get('bytes', 0),
+                    tx_bytes=tx_data.get('bytes', 0),
+                    rx_dropped=rx_data.get('dropped', 0),
+                    tx_dropped=tx_data.get('dropped', 0),
+                    rx_errors=rx_data.get('errors', 0),
+                    tx_errors=tx_data.get('errors', 0),
+                ))
+            current_iface = iface_match.group(1)
+            rx_data = {}
+            tx_data = {}
             continue
-
-        # Primera línea: nombre de interfaz y estado
-        header = lines[0]
-        m_name = re.match(r'^(\S+)', header)
-        if not m_name:
+        
+        # Detectar línea de encabezado RX/TX
+        if 'RX:' in line and 'bytes' in line:
+            rx_line_next = True
             continue
-        iface = m_name.group(1)
+        if 'TX:' in line and 'bytes' in line:
+            tx_line_next = True
+            continue
+        
+        # Parsear datos RX
+        if rx_line_next:
+            numbers = re.findall(r'\d+', line)
+            if len(numbers) >= 5:
+                rx_data = {
+                    'bytes': int(numbers[0]),
+                    'packets': int(numbers[1]),
+                    'errors': int(numbers[2]),
+                    'dropped': int(numbers[3]),
+                }
+            rx_line_next = False
+            continue
+        
+        # Parsear datos TX
+        if tx_line_next:
+            numbers = re.findall(r'\d+', line)
+            if len(numbers) >= 5:
+                tx_data = {
+                    'bytes': int(numbers[0]),
+                    'packets': int(numbers[1]),
+                    'errors': int(numbers[2]),
+                    'dropped': int(numbers[3]),
+                }
+            tx_line_next = False
+            continue
+    
+    # No olvidar la última interfaz
+    if current_iface and rx_data and tx_data:
+        interfaces.append(InterfaceStats(
+            name=current_iface,
+            rx_packets=rx_data.get('packets', 0),
+            tx_packets=tx_data.get('packets', 0),
+            rx_bytes=rx_data.get('bytes', 0),
+            tx_bytes=tx_data.get('bytes', 0),
+            rx_dropped=rx_data.get('dropped', 0),
+            tx_dropped=tx_data.get('dropped', 0),
+            rx_errors=rx_data.get('errors', 0),
+            tx_errors=tx_data.get('errors', 0),
+        ))
+    
+    return interfaces
 
-        state = 'unknown'
-        if 'state UP' in header or 'up' in header.lower():
-            state = 'up'
-        elif 'state DOWN' in header or 'down' in header.lower():
-            state = 'down'
 
-        # Buscar contadores dentro del bloque
-        rx_packets = tx_packets = rx_errors = tx_drops = 0
-
-        for line in lines:
-            m = re.search(r'RX\s+packets[:\s]+(\d+)', line, re.IGNORECASE)
-            if m: rx_packets = int(m.group(1))
-
-            m = re.search(r'TX\s+packets[:\s]+(\d+)', line, re.IGNORECASE)
-            if m: tx_packets = int(m.group(1))
-
-            m = re.search(r'RX.*?errors[:\s]+(\d+)', line, re.IGNORECASE)
-            if m: rx_errors = int(m.group(1))
-
-            m = re.search(r'TX.*?dropped[:\s]+(\d+)', line, re.IGNORECASE)
-            if m: tx_drops = int(m.group(1))
-
-        results.append({
-            'interface': iface,
-            'state':     state,
-            'rx_packets': rx_packets,
-            'tx_packets': tx_packets,
-            'rx_errors':  rx_errors,
-            'tx_drops':   tx_drops,
-        })
-
-    return results
-
-
-def _parse_ospf_stats(raw: str) -> dict:
+def ping_from_router(ssh_conn, destination: str, count: int = 10) -> Optional[PingResult]:
     """
-    Parsea 'show ip ospf neighbor' para contar vecinos y detectar
-    estados problemáticos (Init, Exstart, Exchange — señal de inestabilidad).
+    Ejecuta ping desde el router hacia un destino.
+    count=10 para tener estadísticas significativas.
     """
-    neighbors = []
-    retx_total = 0
-
-    for line in raw.splitlines():
-        # Línea típica: 10.0.12.1  1  Full/DR  00:00:35  10.0.12.1  eth1
-        m = re.match(
-            r'(\d+\.\d+\.\d+\.\d+)\s+\d+\s+(\S+)\s+\S+\s+\S+\s+(\S+)',
-            line.strip()
+    output = ssh_conn.send_command(
+        f"ping {destination} count {count}",
+        expect_string=r"[\$#]",
+        read_timeout=30  # pings pueden tomar tiempo
+    )
+    
+    # Parsear salida de ping en VyOS/Linux:
+    # --- 10.0.12.1 ping statistics ---
+    # 10 packets transmitted, 10 received, 0% packet loss, time 9012ms
+    # rtt min/avg/max/mdev = 0.123/0.456/0.789/0.111 ms
+    
+    result = PingResult(
+        destination=destination,
+        packets_sent=count,
+        packets_received=0,
+        packet_loss_percent=100.0,
+        rtt_min=0.0,
+        rtt_avg=0.0,
+        rtt_max=0.0,
+        rtt_mdev=0.0,
+    )
+    
+    for line in output.splitlines():
+        # Buscar línea de packet loss
+        loss_match = re.search(
+            r'(\d+) packets transmitted, (\d+) received.*?(\d+(?:\.\d+)?)% packet loss',
+            line
         )
-        if m:
-            ip, state, iface = m.group(1), m.group(2), m.group(3)
-            neighbors.append({'neighbor': ip, 'state': state, 'iface': iface})
-            if state.lower() not in ('full', 'full/dr', 'full/bdr'):
-                retx_total += 1     # estado no-Full = inestabilidad / retransmisiones
-
-    return {
-        'neighbor_count': len(neighbors),
-        'neighbors':      neighbors,
-        'unstable_count': retx_total,
-    }
-
-
-def _parse_queue_stats(raw: str) -> dict:
-    """
-    Parsea 'show queueing' si está disponible.
-    En VyOS básico extrae dropped packets como proxy de congestión de cola.
-    """
-    total_drops = 0
-    m = re.findall(r'dropped\s+(\d+)', raw, re.IGNORECASE)
-    for val in m:
-        total_drops += int(val)
-    return {'queue_drops': total_drops}
-
-
-# ── Función principal ─────────────────────────────────────────────────────────
-
-def collect_metrics(device_params: dict) -> dict:
-    """
-    Conecta al router y recolecta métricas de congestión.
-    Retorna un dict con todas las métricas y una lista de anomalías detectadas.
-    """
-    params = dict(device_params)
-    params['global_delay_factor'] = 2
-
-    ip = params['host']
-    metrics = {'host': ip, 'interfaces': [], 'ospf': {}, 'queue': {}, 'anomalies': []}
-
-    with ConnectHandler(**params) as ssh:
-        ssh.find_prompt()
-
-        # 1. Estadísticas de interfaces
-        raw_ifaces = ssh.send_command('show interfaces', expect_string=r'[\$#]')
-        metrics['interfaces'] = _parse_interface_stats(raw_ifaces)
-
-        # 2. Estado OSPF
-        raw_ospf = ssh.send_command('show ip ospf neighbor', expect_string=r'[\$#]')
-        metrics['ospf'] = _parse_ospf_stats(raw_ospf)
-
-        # 3. Colas (best-effort en VyOS básico)
-        try:
-            raw_q = ssh.send_command('show queueing', expect_string=r'[\$#]')
-            metrics['queue'] = _parse_queue_stats(raw_q)
-        except Exception:
-            metrics['queue'] = {'queue_drops': 0}
-
-    # ── Detección de anomalías ────────────────────────────────────────────────
-    anomalies = []
-
-    for iface in metrics['interfaces']:
-        name = iface['interface']
-
-        # Saltar loopback y interfaces down
-        if 'lo' in name or iface['state'] == 'down':
+        if loss_match:
+            result.packets_sent = int(loss_match.group(1))
+            result.packets_received = int(loss_match.group(2))
+            result.packet_loss_percent = float(loss_match.group(3))
             continue
+        
+        # Buscar línea de RTT
+        rtt_match = re.search(
+            r'rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)',
+            line
+        )
+        if rtt_match:
+            result.rtt_min = float(rtt_match.group(1))
+            result.rtt_avg = float(rtt_match.group(2))
+            result.rtt_max = float(rtt_match.group(3))
+            result.rtt_mdev = float(rtt_match.group(4))
+    
+    return result
 
-        total_rx = iface['rx_packets'] or 1
-        total_tx = iface['tx_packets'] or 1
 
-        rx_err_pct = (iface['rx_errors'] / total_rx) * 100
-        tx_drop_pct = (iface['tx_drops'] / total_tx) * 100
+def get_ospf_neighbor_count(ssh_conn) -> int:
+    """Cuenta el número de vecinos OSPF activos."""
+    output = ssh_conn.send_command("show ip ospf neighbor", expect_string=r"[\$#]")
+    
+    # Contar líneas que contengan estado "Full" (vecino completamente establecido)
+    full_neighbors = len(re.findall(r'\bFull\b', output, re.IGNORECASE))
+    return full_neighbors
 
-        if rx_err_pct >= THRESHOLDS['rx_errors_pct']:
-            anomalies.append({
-                'type':      'RX_ERRORS',
-                'interface': name,
-                'value':     round(rx_err_pct, 2),
-                'threshold': THRESHOLDS['rx_errors_pct'],
-                'unit':      '%',
-                'detail':    f"{iface['rx_errors']} errores sobre {total_rx} paquetes RX"
-            })
 
-        if tx_drop_pct >= THRESHOLDS['tx_drops_pct']:
-            anomalies.append({
-                'type':      'TX_DROPS',
-                'interface': name,
-                'value':     round(tx_drop_pct, 2),
-                'threshold': THRESHOLDS['tx_drops_pct'],
-                'unit':      '%',
-                'detail':    f"{iface['tx_drops']} drops sobre {total_tx} paquetes TX"
-            })
+def collect_congestion_metrics(device_params: dict, ping_targets: list[str]) -> CongestionMetrics:
+    """
+    Recolecta todas las métricas de congestión para un router.
+    
+    Args:
+        device_params: Parámetros de conexión Netmiko
+        ping_targets: Lista de IPs a las que hacer ping desde el router
+    
+    Returns:
+        CongestionMetrics con toda la información recolectada
+    """
+    device_params['global_delay_factor'] = 2
+    
+    with ConnectHandler(**device_params) as ssh:
+        ssh.find_prompt()
+        
+        # Recolectar estadísticas de interfaces
+        interfaces = get_interface_stats(ssh)
+        
+        # Hacer pings a los destinos especificados
+        ping_results = []
+        for target in ping_targets:
+            result = ping_from_router(ssh, target, count=10)
+            if result:
+                ping_results.append(result)
+        
+        # Contar vecinos OSPF
+        ospf_neighbors = get_ospf_neighbor_count(ssh)
+        
+        return CongestionMetrics(
+            router_ip=device_params['host'],
+            interfaces=interfaces,
+            ping_results=ping_results,
+            ospf_neighbors=ospf_neighbors,
+        )
 
-    if metrics['ospf'].get('unstable_count', 0) >= THRESHOLDS['ospf_retx']:
-        anomalies.append({
-            'type':      'OSPF_INSTABILITY',
-            'interface': 'N/A',
-            'value':     metrics['ospf']['unstable_count'],
-            'threshold': THRESHOLDS['ospf_retx'],
-            'unit':      'vecinos no-Full',
-            'detail':    f"Vecinos OSPF en estado no-Full: {metrics['ospf']['unstable_count']}"
-        })
 
-    if metrics['queue'].get('queue_drops', 0) > 0:
-        anomalies.append({
-            'type':      'QUEUE_DROPS',
-            'interface': 'N/A',
-            'value':     metrics['queue']['queue_drops'],
-            'threshold': 0,
-            'unit':      'paquetes',
-            'detail':    f"Drops acumulados en colas: {metrics['queue']['queue_drops']}"
-        })
-
-    metrics['anomalies'] = anomalies
-    return metrics
+def format_metrics_for_ai(metrics: CongestionMetrics) -> str:
+    """
+    Formatea las métricas en un string legible para enviar a la IA.
+    """
+    lines = [
+        f"=== MÉTRICAS DE CONGESTIÓN - Router {metrics.router_ip} ===",
+        f"Vecinos OSPF activos: {metrics.ospf_neighbors}",
+        "",
+        "--- ESTADÍSTICAS DE INTERFACES ---",
+    ]
+    
+    for iface in metrics.interfaces:
+        lines.extend([
+            f"  {iface.name}:",
+            f"    RX: {iface.rx_packets} pkts, {iface.rx_bytes} bytes, "
+            f"dropped={iface.rx_dropped}, errors={iface.rx_errors}",
+            f"    TX: {iface.tx_packets} pkts, {iface.tx_bytes} bytes, "
+            f"dropped={iface.tx_dropped}, errors={iface.tx_errors}",
+        ])
+    
+    lines.extend(["", "--- RESULTADOS DE PING ---"])
+    
+    for ping in metrics.ping_results:
+        lines.extend([
+            f"  Destino: {ping.destination}",
+            f"    Enviados: {ping.packets_sent}, Recibidos: {ping.packets_received}, "
+            f"Pérdida: {ping.packet_loss_percent}%",
+            f"    RTT (ms): min={ping.rtt_min:.2f}, avg={ping.rtt_avg:.2f}, "
+            f"max={ping.rtt_max:.2f}, mdev(jitter)={ping.rtt_mdev:.2f}",
+        ])
+    
+    # Agregar análisis de problemas
+    has_issues, issues = metrics.has_congestion_indicators()
+    if has_issues:
+        lines.extend(["", "--- PROBLEMAS DETECTADOS ---"])
+        for issue in issues:
+            lines.append(f"  ⚠️  {issue}")
+    else:
+        lines.extend(["", "--- ESTADO: Sin indicadores de congestión ---"])
+    
+    return "\n".join(lines)

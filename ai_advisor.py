@@ -1,153 +1,246 @@
 # ai_advisor.py
-# Envía métricas de congestión a la API de Claude y recibe comandos VyOS de mitigación.
-# Usa la API de Anthropic (claude-haiku — rápido y gratuito con créditos de prueba).
+"""
+Módulo de asesoría de IA para mitigación de congestión en redes VyOS.
+Usa la API de OpenAI para analizar métricas y generar comandos de mitigación.
+"""
 
+import os
 import json
-import re
-import urllib.request
-import urllib.error
+from dataclasses import dataclass
+from openai import OpenAI
+from congestion_monitor import CongestionMetrics, format_metrics_for_ai
 
-# ── Configuración ─────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY = "TU_API_KEY_AQUI"          # <-- reemplaza con tu key
-CLAUDE_MODEL      = "claude-haiku-4-5-20251001" # modelo rápido y económico
-MAX_TOKENS        = 1024
 
-SYSTEM_PROMPT = """Eres un experto en redes de computadores especializado en VyOS.
-Tu tarea es analizar métricas de congestión de un router VyOS y devolver ÚNICAMENTE
-un objeto JSON con el siguiente formato (sin texto adicional, sin markdown):
+@dataclass
+class AIRecommendation:
+    """Recomendación de la IA para mitigar congestión."""
+    analysis: str               # Análisis del problema
+    severity: str               # "low", "medium", "high", "critical"
+    commands: list[str]         # Comandos VyOS a ejecutar
+    reasoning: str              # Explicación de por qué estos comandos
+    rollback_commands: list[str]  # Comandos para revertir si algo sale mal
+    requires_human_approval: bool  # Si es muy crítico, pedir aprobación
 
+
+# Prompt del sistema que define el comportamiento de la IA
+SYSTEM_PROMPT = """Eres un experto en redes especializado en routers VyOS y mitigación de congestión.
+Tu trabajo es analizar métricas de red y proporcionar comandos específicos de VyOS para mitigar problemas.
+
+CONTEXTO DE LA RED:
+- Topología: 3 routers VyOS en triángulo (R1, R2, R3)
+- Protocolo de enrutamiento: OSPF (area 0)
+- Cada router tiene una VPC conectada a eth0
+- Enlaces entre routers en eth1 y eth2
+
+MÉTRICAS QUE RECIBIRÁS:
+- Estadísticas de interfaces (packets, bytes, dropped, errors)
+- Resultados de ping (RTT, packet loss, jitter/mdev)
+- Cantidad de vecinos OSPF
+
+INDICADORES DE CONGESTIÓN:
+- Packet loss > 5% = congestión moderada
+- Packet loss > 20% = congestión severa
+- RTT > 100ms = latencia alta
+- RTT mdev (jitter) > 50ms = inestabilidad
+- Dropped packets > 100 = cola de interfaz saturada
+- Errores de interfaz = posible problema de capa física
+
+COMANDOS DE MITIGACIÓN DISPONIBLES EN VYOS:
+1. Traffic Shaping (limitar ancho de banda):
+   set traffic-policy shaper <name> bandwidth <rate>
+   set traffic-policy shaper <name> default bandwidth <rate>
+   set interfaces ethernet <ethX> traffic-policy out <name>
+
+2. Modificar costos OSPF (cambiar rutas):
+   set interfaces ethernet <ethX> ip ospf cost <valor>
+   (mayor costo = menos preferida, default=10, máximo=65535)
+
+3. Rate Limiting con traffic-policy:
+   set traffic-policy limiter <name> default bandwidth <rate>
+   set interfaces ethernet <ethX> traffic-policy in <name>
+
+4. QoS con colas de prioridad:
+   set traffic-policy priority-queue <name> class <n> match <match-name> ...
+   set traffic-policy priority-queue <name> class <n> queue-limit <pkts>
+
+REGLAS IMPORTANTES:
+- SIEMPRE devuelve JSON válido con la estructura especificada
+- Los comandos deben ser comandos VyOS en modo configuración (sin "configure")
+- Incluye comandos de rollback para revertir cambios
+- Si la congestión es severa (>50% loss), marca requires_human_approval=true
+- Prioriza soluciones que NO rompan la conectividad
+- Para congestión leve, prefiere ajustar costos OSPF para redistribuir tráfico
+- Para congestión severa, usa traffic shaping
+
+FORMATO DE RESPUESTA (JSON):
 {
-  "severity": "low|medium|high|critical",
-  "reasoning": "Explicación técnica breve del problema detectado",
-  "commands": ["set ...", "set ...", "delete ..."],
-  "explanation": "Qué hace cada comando y por qué mitiga la congestión"
+    "analysis": "Descripción del problema detectado",
+    "severity": "low|medium|high|critical",
+    "commands": ["comando1", "comando2", ...],
+    "reasoning": "Explicación técnica de por qué estos comandos ayudarán",
+    "rollback_commands": ["delete comando1", "delete comando2", ...],
+    "requires_human_approval": false
 }
-
-Reglas para los comandos VyOS:
-- Usa sintaxis VyOS (set / delete), no Cisco IOS
-- Prioriza: traffic shaping, rate-limiting, ajuste de timers OSPF, redistribución de carga
-- Si no hay congestión real, devuelve commands: [] y severity: "low"
-- Los comandos deben ser ejecutables directamente en 'configure' mode de VyOS
-- Ejemplos de comandos válidos:
-    set traffic-policy shaper WAN bandwidth '10mbit'
-    set traffic-policy shaper WAN default bandwidth '20%'
-    set interfaces ethernet eth1 traffic-policy out WAN
-    set protocols ospf parameters router-id '10.0.0.1'
-    set protocols ospf timers throttle spf 200 1000 10000
 """
 
 
-def _build_user_prompt(metrics: dict) -> str:
-    """Construye el prompt de usuario con las métricas del router."""
-    ip = metrics.get('host', 'desconocido')
-    anomalies = metrics.get('anomalies', [])
-    interfaces = metrics.get('interfaces', [])
-    ospf = metrics.get('ospf', {})
-
-    lines = [f"Router analizado: {ip}", ""]
-
-    # Resumen de interfaces
-    lines.append("=== INTERFACES ===")
-    for iface in interfaces:
-        if 'lo' in iface.get('interface', ''):
-            continue
-        lines.append(
-            f"  {iface['interface']}: estado={iface['state']}, "
-            f"rx_pkts={iface['rx_packets']}, tx_pkts={iface['tx_packets']}, "
-            f"rx_errors={iface['rx_errors']}, tx_drops={iface['tx_drops']}"
-        )
-
-    # Estado OSPF
-    lines.append("")
-    lines.append("=== OSPF ===")
-    lines.append(f"  Vecinos totales: {ospf.get('neighbor_count', 0)}")
-    lines.append(f"  Vecinos inestables (no-Full): {ospf.get('unstable_count', 0)}")
-    for n in ospf.get('neighbors', []):
-        lines.append(f"    {n['neighbor']} via {n['iface']} — {n['state']}")
-
-    # Queue drops
-    queue_drops = metrics.get('queue', {}).get('queue_drops', 0)
-    lines.append("")
-    lines.append(f"=== COLAS === drops_totales={queue_drops}")
-
-    # Anomalías detectadas
-    lines.append("")
-    if anomalies:
-        lines.append("=== ANOMALÍAS DETECTADAS ===")
-        for a in anomalies:
-            lines.append(
-                f"  [{a['type']}] interfaz={a['interface']} "
-                f"valor={a['value']}{a['unit']} (umbral={a['threshold']}{a['unit']}): {a['detail']}"
-            )
-    else:
-        lines.append("=== ANOMALÍAS: Ninguna detectada ===")
-
-    lines.append("")
-    lines.append("Basándote en estas métricas, proporciona comandos VyOS para mitigar cualquier problema.")
-
-    return "\n".join(lines)
-
-
-def query_ai(metrics: dict) -> dict:
+def get_ai_recommendation(
+    metrics: CongestionMetrics,
+    api_key: str = None,
+    model: str = "gpt-4o-mini"
+) -> AIRecommendation:
     """
-    Envía las métricas a Claude y retorna el JSON de mitigación.
-    Retorna un dict con severity, reasoning, commands, explanation.
+    Envía métricas de congestión a OpenAI y obtiene recomendaciones.
+    
+    Args:
+        metrics: Métricas de congestión del router
+        api_key: API key de OpenAI (o usa OPENAI_API_KEY del entorno)
+        model: Modelo de OpenAI a usar
+    
+    Returns:
+        AIRecommendation con análisis y comandos
     """
-    prompt = _build_user_prompt(metrics)
+    # Usar API key del parámetro o del entorno
+    api_key = api_key or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("Se requiere OPENAI_API_KEY en el entorno o como parámetro")
+    
+    client = OpenAI(api_key=api_key)
+    
+    # Formatear métricas para la IA
+    metrics_text = format_metrics_for_ai(metrics)
+    
+    # Agregar contexto adicional sobre problemas detectados
+    has_issues, issues = metrics.has_congestion_indicators()
+    
+    user_message = f"""Analiza las siguientes métricas de red y proporciona comandos de mitigación si es necesario.
 
-    payload = json.dumps({
-        "model":      CLAUDE_MODEL,
-        "max_tokens": MAX_TOKENS,
-        "system":     SYSTEM_PROMPT,
-        "messages":   [{"role": "user", "content": prompt}]
-    }).encode("utf-8")
+{metrics_text}
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={
-            "Content-Type":      "application/json",
-            "x-api-key":         ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-        },
-        method="POST"
+{'PROBLEMAS DETECTADOS: ' + ', '.join(issues) if has_issues else 'No se detectaron problemas obvios, pero revisa las métricas por cualquier anomalía.'}
+
+Por favor responde ÚNICAMENTE con JSON válido siguiendo el formato especificado."""
+
+    # Llamar a la API de OpenAI
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message}
+        ],
+        temperature=0.3,  # Baja temperatura para respuestas más consistentes
+        response_format={"type": "json_object"}  # Forzar respuesta JSON
+    )
+    
+    # Parsear respuesta JSON
+    response_text = response.choices[0].message.content
+    data = json.loads(response_text)
+    
+    return AIRecommendation(
+        analysis=data.get("analysis", "No se pudo analizar"),
+        severity=data.get("severity", "low"),
+        commands=data.get("commands", []),
+        reasoning=data.get("reasoning", "Sin razonamiento proporcionado"),
+        rollback_commands=data.get("rollback_commands", []),
+        requires_human_approval=data.get("requires_human_approval", False),
     )
 
+
+def print_recommendation(rec: AIRecommendation, router_ip: str):
+    """Imprime la recomendación de forma legible."""
+    severity_colors = {
+        "low": "🟢",
+        "medium": "🟡", 
+        "high": "🟠",
+        "critical": "🔴"
+    }
+    
+    icon = severity_colors.get(rec.severity, "⚪")
+    
+    print("\n" + "="*60)
+    print(f"🤖 ANÁLISIS DE IA - Router {router_ip}")
+    print("="*60)
+    print(f"\n{icon} Severidad: {rec.severity.upper()}")
+    print(f"\n📊 Análisis:")
+    print(f"   {rec.analysis}")
+    print(f"\n💡 Razonamiento:")
+    print(f"   {rec.reasoning}")
+    
+    if rec.commands:
+        print(f"\n🔧 Comandos de mitigación:")
+        for cmd in rec.commands:
+            print(f"   • {cmd}")
+    else:
+        print(f"\n✅ No se requieren comandos de mitigación")
+    
+    if rec.rollback_commands:
+        print(f"\n↩️  Comandos de rollback (si hay problemas):")
+        for cmd in rec.rollback_commands:
+            print(f"   • {cmd}")
+    
+    if rec.requires_human_approval:
+        print(f"\n⚠️  REQUIERE APROBACIÓN HUMANA antes de ejecutar")
+    
+    print("="*60 + "\n")
+
+
+def apply_ai_recommendation(device_params: dict, rec: AIRecommendation, auto_apply: bool = False) -> bool:
+    """
+    Aplica los comandos recomendados por la IA al router.
+    
+    Args:
+        device_params: Parámetros de conexión Netmiko
+        rec: Recomendación de la IA
+        auto_apply: Si True, aplica sin pedir confirmación (excepto si requires_human_approval)
+    
+    Returns:
+        True si se aplicaron los comandos, False si no
+    """
+    from network_driver import apply_repair
+    
+    if not rec.commands:
+        print("[INFO] No hay comandos que aplicar")
+        return False
+    
+    # Si requiere aprobación humana, siempre preguntar
+    if rec.requires_human_approval:
+        print("\n⚠️  La IA recomienda aprobación humana para estos cambios.")
+        print("Comandos propuestos:")
+        for cmd in rec.commands:
+            print(f"  • {cmd}")
+        
+        response = input("\n¿Desea aplicar estos comandos? (s/n): ").strip().lower()
+        if response != 's':
+            print("[INFO] Comandos NO aplicados por decisión del usuario")
+            return False
+    
+    # Si no es auto_apply, preguntar
+    elif not auto_apply:
+        print("\nComandos propuestos:")
+        for cmd in rec.commands:
+            print(f"  • {cmd}")
+        
+        response = input("\n¿Desea aplicar estos comandos? (s/n): ").strip().lower()
+        if response != 's':
+            print("[INFO] Comandos NO aplicados por decisión del usuario")
+            return False
+    
+    # Aplicar comandos
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-
-        # Extraer texto de la respuesta
-        raw_text = ""
-        for block in body.get("content", []):
-            if block.get("type") == "text":
-                raw_text += block["text"]
-
-        # Limpiar posibles fences de markdown
-        clean = re.sub(r'```(?:json)?|```', '', raw_text).strip()
-
-        result = json.loads(clean)
-        return result
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8")
-        return {
-            "severity":    "unknown",
-            "reasoning":   f"Error HTTP {e.code} al consultar la IA: {error_body[:200]}",
-            "commands":    [],
-            "explanation": "No se pudo obtener respuesta de la IA."
-        }
-    except json.JSONDecodeError as e:
-        return {
-            "severity":    "unknown",
-            "reasoning":   f"La IA devolvió una respuesta no parseable: {raw_text[:300]}",
-            "commands":    [],
-            "explanation": "Error de parseo JSON."
-        }
+        print(f"\n[*] Aplicando {len(rec.commands)} comandos de mitigación...")
+        apply_repair(device_params, rec.commands)
+        print("[OK] Comandos aplicados exitosamente")
+        return True
     except Exception as e:
-        return {
-            "severity":    "unknown",
-            "reasoning":   f"Error inesperado: {str(e)}",
-            "commands":    [],
-            "explanation": "No se pudo completar la consulta."
-        }
+        print(f"[ERROR] Fallo al aplicar comandos: {e}")
+        
+        # Intentar rollback si hay comandos de rollback
+        if rec.rollback_commands:
+            print("[*] Intentando rollback...")
+            try:
+                apply_repair(device_params, rec.rollback_commands)
+                print("[OK] Rollback exitoso")
+            except Exception as e2:
+                print(f"[ERROR] Rollback falló: {e2}")
+        
+        return False

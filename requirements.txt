@@ -1,0 +1,11 @@
+# Self-Healing Network con IA
+# Dependencias de Python
+
+# Conexión SSH a routers VyOS
+netmiko>=4.1.0
+
+# API de OpenAI para análisis de congestión
+openai>=1.0.0
+
+# Utilidades (probablemente ya instaladas)
+typing-extensions>=4.0.0
